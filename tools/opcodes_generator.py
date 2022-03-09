@@ -1,30 +1,36 @@
+import argparse
 import json
 
 
-def to_opcode_definition(value: bytes, json_object: dict):
-    bytes_literal = ''.join([f'\\x{byte:02x}' for byte in value])
+def to_dict_entry(value: int, json_object: dict):
+    hex_repr = f'0x{value:02x}'
     return (
-        f"b'{bytes_literal}': OpCode(name='{json_object['Name']}\', "
-        f"length={json_object['Length']}, "
-        f"code=b'{bytes_literal}'"
+        f"{hex_repr}: CPUInstruction(\n"
+        f"    name='{json_object['Name']}\',\n"
+        f"    length={json_object['Length']},\n"
+        f"    cycles={json_object['TCyclesNoBranch']},\n"
+        f"    opcode={hex_repr}\n"
         f"),"
     )
 
 
-def read_file(filename):
+def read_file(filename: str):
     with open(filename) as f:
         data = json.load(f)
 
     for i, instruction in enumerate(data['Unprefixed']):
-        value = i.to_bytes(1, byteorder='little')
-        opcode = to_opcode_definition(value, instruction)
-        print(opcode)
+        entry = to_dict_entry(i, instruction)
+        print(entry)
 
     for i, instruction in enumerate(data['CBPrefixed']):
-        value = b'\xcb' + i.to_bytes(1, byteorder='little')
-        opcode = to_opcode_definition(value, instruction)
-        print(opcode)
+        value = (0xcb << 8) + i
+        entry = to_dict_entry(value, instruction)
+        print(entry)
 
 
 if __name__ == '__main__':
-    read_file('data/dmgops.json')
+    parser = argparse.ArgumentParser(description='Generates boilerplate code for opcodes.')
+    parser.add_argument('filename', help='the path of the JSON file containing the opcode definitions')
+    args = parser.parse_args()
+
+    read_file(args.filename)
