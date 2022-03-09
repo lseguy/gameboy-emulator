@@ -1,13 +1,12 @@
 from cpu.instruction import CPUInstruction
-from cpu.registers import Register
 from cpu.registers import Registers
 from mmu.memory import Memory
 from utils.bit_operations import get_bit
 from utils.bit_operations import read_signed
 
 
-def set_register(register: Register, value: int) -> None:
-    register.value = value & 0xff
+def set_register(registers: Registers, name: str, value: int) -> None:
+    setattr(registers, name, value)
 
 
 def set_hl(registers: Registers, value: int) -> None:
@@ -21,7 +20,7 @@ def write_mem_dec_hl(registers: Registers, memory: Memory, value: int) -> None:
 
 def xor(registers: Registers, lhs: int, rhs: int) -> None:
     result = lhs ^ rhs
-    registers.a.value = lhs ^ rhs
+    registers.a = lhs ^ rhs
     registers.z_flag = result == 0
     registers.n_flag = False
     registers.h_flag = False
@@ -36,17 +35,17 @@ def test_bit(registers: Registers, byte: int, bit_position: int) -> None:
 
 
 def inc_c(registers: Registers) -> None:
-    result = (registers.c.value + 1) & 0xff
+    result = (registers.c + 1) & 0xff
     registers.z_flag = result == 0
     registers.n_flag = False
-    registers.h_flag = (0x0f & result) < (0x0f & registers.c.value)
-    registers.c.value = result
+    registers.h_flag = (0x0f & result) < (0x0f & registers.c)
+    registers.c = result
 
 
 def jump_nz(registers: Registers, value: int) -> None:
     if not registers.z_flag:
         offset = read_signed(value)
-        registers.pc.value += offset
+        registers.pc += offset
 
 
 def noop(*args) -> None:
@@ -145,7 +144,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0x0e,
-        run=lambda r, m, o: set_register(r.c, o.to_word()),
+        run=lambda r, m, o: set_register(r, 'c', o.to_word()),
     ),
     0x0f: CPUInstruction(
         name='RRCA',
@@ -358,14 +357,14 @@ opcodes = {
         length=3,
         cycles=12,
         opcode=0x31,
-        run=lambda r, m, o: set_register(r.sp, o.to_dword()),
+        run=lambda r, m, o: set_register(r, 'sp', o.to_dword()),
     ),
     0x32: CPUInstruction(
         name='LD (HL-),A',
         length=1,
         cycles=8,
         opcode=0x32,
-        run=lambda r, m, o: write_mem_dec_hl(r, m, r.a.value),
+        run=lambda r, m, o: write_mem_dec_hl(r, m, r.a),
     ),
     0x33: CPUInstruction(
         name='INC SP',
@@ -438,7 +437,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0x3e,
-        run=lambda r, m, o: set_register(r.a, o.to_word()),
+        run=lambda r, m, o: set_register(r, 'a', o.to_word()),
     ),
     0x3f: CPUInstruction(
         name='CCF',
@@ -781,7 +780,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x77,
-        run=lambda r, m, o: m.write(r.hl, r.a.value),
+        run=lambda r, m, o: m.write(r.hl, r.a),
     ),
     0x78: CPUInstruction(
         name='LD A,B',
@@ -1118,7 +1117,7 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0xaf,
-        run=lambda r, m, o: xor(r, r.a.value, r.a.value),
+        run=lambda r, m, o: xor(r, r.a, r.a),
     ),
     0xb0: CPUInstruction(
         name='OR A,B',
@@ -1413,7 +1412,7 @@ opcodes = {
         length=2,
         cycles=12,
         opcode=0xe0,
-        run=lambda r, m, o: m.write(0xff00 + o.to_word(), r.a.value),
+        run=lambda r, m, o: m.write(0xff00 + o.to_word(), r.a),
     ),
     0xe1: CPUInstruction(
         name='POP HL',
@@ -1426,7 +1425,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0xe2,
-        run=lambda r, m, o: m.write(0xff00 + r.c.value, r.a.value),
+        run=lambda r, m, o: m.write(0xff00 + r.c, r.a),
     ),
     0xe3: CPUInstruction(
         name='UNUSED',
@@ -2351,7 +2350,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0xcb7c,
-        run=lambda r, m, o: test_bit(r, r.h.value, 7),
+        run=lambda r, m, o: test_bit(r, r.h, 7),
     ),
     0xcb7d: CPUInstruction(
         name='BIT 7,L',

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Tuple
 
 from utils.bit_operations import get_bit
 from utils.bit_operations import set_bit
@@ -9,63 +10,61 @@ H_FLAG_POSITION = 5
 C_FLAG_POSITION = 4
 
 
-@dataclass
 class Register:
-    _value: int = 0
+    def __set_name__(self, owner, name):
+        self.private_name = f'_{name}'
 
-    @property
-    def value(self) -> int:
-        return self._value
+    def __get__(self, instance, owner):
+        return getattr(instance, self.private_name, 0)
 
-    @value.setter
-    def value(self, new_value: int) -> None:
-        self._value = new_value & 0xff
+    def __set__(self, instance, value):
+        setattr(instance, self.private_name, value & 0xff)
 
 
 @dataclass
 class Registers:
-    a: Register = Register()
-    b: Register = Register()
-    c: Register = Register()
-    d: Register = Register()
-    e: Register = Register()
-    f: Register = Register()
-    h: Register = Register()
-    l: Register = Register()
-    sp: Register = Register()
-    pc: Register = Register()
+    a: int = Register()
+    b: int = Register()
+    c: int = Register()
+    d: int = Register()
+    e: int = Register()
+    f: int = Register()
+    h: int = Register()
+    l: int = Register()
+    sp: int = Register()
+    pc: int = Register()
 
     @property
     def af(self) -> int:
-        return self._read_paired_registers(self.a, self.f)
+        return self._combine_bytes(self.a, self.f)
 
     @af.setter
     def af(self, value: int) -> None:
-        self._write_paired_registers(self.a, self.f, value)
+        self.a, self.f = self._split_bytes(value)
 
     @property
     def bc(self) -> int:
-        return self._read_paired_registers(self.b, self.c)
+        return self._combine_bytes(self.b, self.c)
 
     @bc.setter
     def bc(self, value: int) -> None:
-        self._write_paired_registers(self.b, self.c, value)
+        self.b, self.c = self._split_bytes(value)
 
     @property
     def de(self) -> int:
-        return self._read_paired_registers(self.d, self.e)
+        return self._combine_bytes(self.d, self.e)
 
     @de.setter
     def de(self, value: int) -> None:
-        self._write_paired_registers(self.d, self.e, value)
+        self.d, self.e = self._split_bytes(value)
 
     @property
     def hl(self) -> int:
-        return self._read_paired_registers(self.h, self.l)
+        return self._combine_bytes(self.h, self.l)
 
     @hl.setter
     def hl(self, value: int) -> None:
-        self._write_paired_registers(self.h, self.l, value)
+        self.h, self.l = self._split_bytes(value)
 
     @property
     def z_flag(self) -> bool:
@@ -100,16 +99,15 @@ class Registers:
         self._set_flag(C_FLAG_POSITION, value)
 
     def _set_flag(self, flag_position: int, value: bool) -> None:
-        self.f.value = set_bit(self.f.value, flag_position, int(value))
+        self.f = set_bit(self.f, flag_position, int(value))
 
     def _get_flag(self, flag_position: int) -> bool:
-        return get_bit(self.f.value, flag_position) != 0
+        return get_bit(self.f, flag_position) != 0
 
     @staticmethod
-    def _read_paired_registers(left: Register, right: Register) -> int:
-        return (left.value << 8) | right.value
+    def _combine_bytes(left: int, right: int) -> int:
+        return (left << 8) | right
 
     @staticmethod
-    def _write_paired_registers(left: Register, right: Register, value: int) -> None:
-        left.value = value >> 8
-        right.value = value & 0xff
+    def _split_bytes(value: int) -> Tuple[int, int]:
+        return value >> 8, value & 0xff

@@ -29,9 +29,8 @@ class CPU:
             print(self.registers)
 
     def fetch(self) -> int:
-        pc = self.registers.pc
-        data = self.memory.read(pc.value)
-        pc.value += 1
+        data = self.memory.read(self.registers.pc)
+        self.registers.pc += 1
         return data
 
     def decode(self, byte: int) -> CPUInstruction:
