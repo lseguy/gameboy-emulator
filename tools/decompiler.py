@@ -1,42 +1,35 @@
 import argparse
-from typing import BinaryIO
-from typing import Optional
+from typing import Iterator
 
-from opcodes import opcodes
-
-
-def read_rom(filename):
-    with open(filename, 'rb') as f:
-        while True:
-            operation = read_operation(f)
-            if not operation:
-                break
-
-            print(operation)
+from cpu.opcodes import opcodes
+from utils.files import read_binary_file
 
 
-def read_operation(file: BinaryIO) -> Optional[str]:
-    byte = file.read(1)
+def decompile(iterator: Iterator[int]) -> None:
+    while True:
+        opcode = next(iterator, None)
+        if opcode is None:
+            return
 
-    if not byte:
-        return
+        if is_prefixed_opcode(opcode):
+            opcode = opcode << 8 | next(iterator)
 
-    if is_prefixed_opcode(byte):
-        opcode = opcodes[byte + file.read(1)]
-    else:
-        opcode = opcodes[byte]
+        instruction = opcodes[opcode]
+        operand_bytes = bytes([next(iterator) for _ in range(instruction.args_length)])
 
-    operands_bytes = file.read(opcode.args_length)
-    return f'{opcode} ${read_operand(operands_bytes).hex()}'
-
-
-def is_prefixed_opcode(byte):
-    return byte == b'\xcb'
+        if len(operand_bytes) > 0:
+            operands = read_operands(operand_bytes)
+            print(f'{instruction} ${operands:x}')
+        else:
+            print(instruction)
 
 
-def read_operand(arg: bytes) -> bytes:
-    # Arguments are little-endian
-    return bytes(reversed(arg))
+def is_prefixed_opcode(byte: int) -> bool:
+    return byte == 0xcb
+
+
+def read_operands(arg: bytes) -> int:
+    return int.from_bytes(arg, byteorder='little')
 
 
 if __name__ == '__main__':
@@ -44,4 +37,5 @@ if __name__ == '__main__':
     parser.add_argument('filename', help='the filename of the ROM to decompile')
     args = parser.parse_args()
 
-    read_rom(args.filename)
+    file_data = read_binary_file(args.filename)
+    decompile(iter(file_data))
