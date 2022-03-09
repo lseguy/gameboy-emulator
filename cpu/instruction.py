@@ -24,7 +24,7 @@ class Operands:
 
         return self.bytes[1] << 8 | self.bytes[0]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if len(self.bytes) == 1:
             return f'{self.to_word():x}'
 
@@ -47,9 +47,9 @@ class CPUInstruction:
             self.run = _default_operation
 
     @property
-    def args_length(self):
+    def args_length(self) -> int:
         opcode_length = 2 if self.opcode >= 0xcb00 else 1
         return self.length - opcode_length
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'[{self.opcode:#04x}] {self.name}'

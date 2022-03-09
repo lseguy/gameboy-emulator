@@ -2,7 +2,7 @@ import argparse
 import json
 
 
-def to_dict_entry(value: int, json_object: dict):
+def to_dict_entry(value: int, json_object: dict) -> str:
     hex_repr = f'0x{value:02x}'
     return (
         f"{hex_repr}: CPUInstruction(\n"
@@ -14,7 +14,7 @@ def to_dict_entry(value: int, json_object: dict):
     )
 
 
-def read_file(filename: str):
+def process_file(filename: str) -> None:
     with open(filename) as f:
         data = json.load(f)
 
@@ -33,4 +33,4 @@ if __name__ == '__main__':
     parser.add_argument('filename', help='the path of the JSON file containing the opcode definitions')
     args = parser.parse_args()
 
-    read_file(args.filename)
+    process_file(args.filename)

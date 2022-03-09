@@ -40,7 +40,7 @@ class Registers:
         return self._read_paired_registers(self.a, self.f)
 
     @af.setter
-    def af(self, value: int):
+    def af(self, value: int) -> None:
         self._write_paired_registers(self.a, self.f, value)
 
     @property
@@ -48,7 +48,7 @@ class Registers:
         return self._read_paired_registers(self.b, self.c)
 
     @bc.setter
-    def bc(self, value: int):
+    def bc(self, value: int) -> None:
         self._write_paired_registers(self.b, self.c, value)
 
     @property
@@ -56,7 +56,7 @@ class Registers:
         return self._read_paired_registers(self.d, self.e)
 
     @de.setter
-    def de(self, value: int):
+    def de(self, value: int) -> None:
         self._write_paired_registers(self.d, self.e, value)
 
     @property
@@ -64,7 +64,7 @@ class Registers:
         return self._read_paired_registers(self.h, self.l)
 
     @hl.setter
-    def hl(self, value: int):
+    def hl(self, value: int) -> None:
         self._write_paired_registers(self.h, self.l, value)
 
     @property

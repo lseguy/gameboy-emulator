@@ -12,12 +12,8 @@ class CPU:
 
     def start(self) -> None:
         while True:
-            opcode = self.fetch()
-
-            if opcode == 0xcb:
-                opcode = 0xcb << 8 | self.fetch()
-
-            instruction = self.decode(opcode)
+            byte = self.fetch()
+            instruction = self.decode(byte)
 
             if instruction.args_length:
                 args = Operands(bytes(self.fetch() for _ in range(instruction.args_length)))
@@ -29,7 +25,7 @@ class CPU:
             else:
                 print(instruction)
 
-            instruction.run(self.registers, self.memory, args)
+            self.execute(instruction, args)
             print(self.registers)
 
     def fetch(self) -> int:
@@ -39,7 +35,16 @@ class CPU:
         return data
 
     def decode(self, byte: int) -> CPUInstruction:
-        return opcodes[byte]
+        if self._is_prefixed_opcode(byte):
+            opcode = 0xcb << 8 | self.fetch()
+        else:
+            opcode = byte
 
-    def execute(self, instruction: CPUInstruction) -> None:
-        pass
+        return opcodes[opcode]
+
+    def execute(self, instruction: CPUInstruction, operands: Operands) -> None:
+        instruction.run(self.registers, self.memory, operands)
+
+    @staticmethod
+    def _is_prefixed_opcode(byte: int) -> bool:
+        return byte == 0xcb
