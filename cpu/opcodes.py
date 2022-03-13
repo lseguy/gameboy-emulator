@@ -1,5 +1,3 @@
-from typing import Union
-
 from cpu.instruction import CPUInstruction
 from cpu.registers import Registers
 from custom_types import i8
@@ -9,6 +7,7 @@ from custom_types import u8
 from utils.bit_operations import combine_bytes
 from utils.bit_operations import get_bit
 from utils.bit_operations import set_bit
+from utils.bit_operations import split_bytes
 
 
 def set_register(registers: Registers, register_name: str, value: int) -> None:
@@ -106,7 +105,7 @@ def add_u8(registers: Registers, lhs: u8, rhs: u8) -> u8:
 
 
 def add_u8_with_carry(registers: Registers, lhs: u8, rhs: u8) -> u8:
-    result = add_u8(registers, lhs, rhs + int(registers.c_flag))
+    result = add_u8(registers, lhs, u8(rhs + int(registers.c_flag)))
 
     return u8(result)
 
@@ -121,22 +120,40 @@ def add_u16(registers: Registers, lhs: u16, rhs: u16) -> u16:
     return u16(result)
 
 
-def inc(registers: Registers, value: Union[u8, u16]) -> int:
+def inc_u8(registers: Registers, value: u8) -> u8:
     result = (value + 1) & 0xff
     registers.z_flag = result == 0
     registers.n_flag = False
     registers.h_flag = (0x0f & result) < (0x0f & value)
 
-    return result
+    return u8(result)
 
 
-def dec(registers: Registers, value: Union[u8, u16]) -> int:
+def inc_u16(registers: Registers, value: u16) -> u16:
+    result = (value + 1) & 0xffff
+    registers.z_flag = result == 0
+    registers.n_flag = False
+    registers.h_flag = (0x0f & result) < (0x0f & value)
+
+    return u16(result)
+
+
+def dec_u8(registers: Registers, value: u8) -> u8:
     result = (value - 1) & 0xff
     registers.z_flag = result == 0
     registers.n_flag = True
     registers.h_flag = (0x0f & value) == 0
 
     return u8(result)
+
+
+def dec_u16(registers: Registers, value: u16) -> u16:
+    result = (value - 1) & 0xffff
+    registers.z_flag = result == 0
+    registers.n_flag = True
+    registers.h_flag = (0x0f & value) == 0
+
+    return u16(result)
 
 
 def rotate_left(registers: Registers, value: u8, through_carry: bool = False) -> u8:
@@ -212,8 +229,7 @@ def ret(registers: Registers, memory: Memory, condition: bool = True) -> None:
 
 
 def push_stack(registers: Registers, memory: Memory, value: u16) -> None:
-    lsb = u8(value & 0xff)
-    msb = u8(value >> 8)
+    msb, lsb = split_bytes(value)
 
     registers.sp = u16(registers.sp - 1)
     memory.write_u8(registers.sp, msb)
@@ -227,7 +243,7 @@ def pop_stack(registers: Registers, memory: Memory) -> u16:
     msb = memory.read(registers.sp)
     registers.sp = u16(registers.sp + 1)
 
-    return combine_bytes(u8(msb), lsb)
+    return combine_bytes(msb, lsb)
 
 
 def noop(*args) -> None:
@@ -254,28 +270,28 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x02,
-        run=lambda r, m, o: set_register(r, 'bc', r.a),
+        run=lambda r, m, o: m.write_u8(r.bc, r.a),
     ),
     0x03: CPUInstruction(
         name='INC BC',
         length=1,
         cycles=8,
         opcode=0x03,
-        run=lambda r, m, o: set_register(r, 'bc', u16(inc(r, r.bc))),
+        run=lambda r, m, o: set_register(r, 'bc', inc_u16(r, r.bc)),
     ),
     0x04: CPUInstruction(
         name='INC B',
         length=1,
         cycles=4,
         opcode=0x04,
-        run=lambda r, m, o: set_register(r, 'b', u8(inc(r, r.b))),
+        run=lambda r, m, o: set_register(r, 'b', inc_u8(r, r.b)),
     ),
     0x05: CPUInstruction(
         name='DEC B',
         length=1,
         cycles=4,
         opcode=0x05,
-        run=lambda r, m, o: set_register(r, 'b', u8(dec(r, r.b))),
+        run=lambda r, m, o: set_register(r, 'b', dec_u8(r, r.b)),
     ),
     0x06: CPUInstruction(
         name='LD B,u8',
@@ -317,21 +333,21 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x0b,
-        run=lambda r, m, o: set_register(r, 'bc', dec(r, r.bc)),
+        run=lambda r, m, o: set_register(r, 'bc', dec_u16(r, r.bc)),
     ),
     0x0c: CPUInstruction(
         name='INC C',
         length=1,
         cycles=4,
         opcode=0x0c,
-        run=lambda r, m, o: set_register(r, 'c', inc(r, r.c)),
+        run=lambda r, m, o: set_register(r, 'c', inc_u8(r, r.c)),
     ),
     0x0d: CPUInstruction(
         name='DEC C',
         length=1,
         cycles=4,
         opcode=0x0d,
-        run=lambda r, m, o: set_register(r, 'c', dec(r, r.c)),
+        run=lambda r, m, o: set_register(r, 'c', dec_u8(r, r.c)),
     ),
     0x0e: CPUInstruction(
         name='LD C,u8',
@@ -351,7 +367,8 @@ opcodes = {
         name='STOP',
         length=1,
         cycles=4,
-        opcode=0x10
+        opcode=0x10,
+        run=noop,
     ),
     0x11: CPUInstruction(
         name='LD DE,u16',
@@ -372,21 +389,21 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x13,
-        run=lambda r, m, o: set_register(r, 'de', inc(r, r.de)),
+        run=lambda r, m, o: set_register(r, 'de', inc_u16(r, r.de)),
     ),
     0x14: CPUInstruction(
         name='INC D',
         length=1,
         cycles=4,
         opcode=0x14,
-        run=lambda r, m, o: set_register(r, 'd', inc(r, r.d)),
+        run=lambda r, m, o: set_register(r, 'd', inc_u8(r, r.d)),
     ),
     0x15: CPUInstruction(
         name='DEC D',
         length=1,
         cycles=4,
         opcode=0x15,
-        run=lambda r, m, o: set_register(r, 'd', dec(r, r.d)),
+        run=lambda r, m, o: set_register(r, 'd', dec_u8(r, r.d)),
     ),
     0x16: CPUInstruction(
         name='LD D,u8',
@@ -428,21 +445,21 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x1b,
-        run=lambda r, m, o: set_register(r, 'de', dec(r, r.de)),
+        run=lambda r, m, o: set_register(r, 'de', dec_u16(r, r.de)),
     ),
     0x1c: CPUInstruction(
         name='INC E',
         length=1,
         cycles=4,
         opcode=0x1c,
-        run=lambda r, m, o: set_register(r, 'e', inc(r, r.e)),
+        run=lambda r, m, o: set_register(r, 'e', inc_u8(r, r.e)),
     ),
     0x1d: CPUInstruction(
         name='DEC E',
         length=1,
         cycles=4,
         opcode=0x1d,
-        run=lambda r, m, o: set_register(r, 'e', dec(r, r.e)),
+        run=lambda r, m, o: set_register(r, 'e', dec_u8(r, r.e)),
     ),
     0x1e: CPUInstruction(
         name='LD E,u8',
@@ -484,21 +501,21 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x23,
-        run=lambda r, m, o: set_register(r, 'hl', inc(r, r.hl)),
+        run=lambda r, m, o: set_register(r, 'hl', inc_u16(r, r.hl)),
     ),
     0x24: CPUInstruction(
         name='INC H',
         length=1,
         cycles=4,
         opcode=0x24,
-        run=lambda r, m, o: set_register(r, 'h', inc(r, r.h)),
+        run=lambda r, m, o: set_register(r, 'h', inc_u8(r, r.h)),
     ),
     0x25: CPUInstruction(
         name='DEC H',
         length=1,
         cycles=4,
         opcode=0x25,
-        run=lambda r, m, o: set_register(r, 'h', dec(r, r.h)),
+        run=lambda r, m, o: set_register(r, 'h', dec_u8(r, r.h)),
     ),
     0x26: CPUInstruction(
         name='LD H,u8',
@@ -539,21 +556,21 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x2b,
-        run=lambda r, m, o: set_register(r, 'hl', dec(r, r.hl)),
+        run=lambda r, m, o: set_register(r, 'hl', dec_u16(r, r.hl)),
     ),
     0x2c: CPUInstruction(
         name='INC L',
         length=1,
         cycles=4,
         opcode=0x2c,
-        run=lambda r, m, o: set_register(r, 'l', inc(r, r.l)),
+        run=lambda r, m, o: set_register(r, 'l', inc_u8(r, r.l)),
     ),
     0x2d: CPUInstruction(
         name='DEC L',
         length=1,
         cycles=4,
         opcode=0x2d,
-        run=lambda r, m, o: set_register(r, 'l', dec(r, r.l)),
+        run=lambda r, m, o: set_register(r, 'l', dec_u8(r, r.l)),
     ),
     0x2e: CPUInstruction(
         name='LD L,u8',
@@ -594,26 +611,28 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x33,
-        run=lambda r, m, o: set_register(r, 'sp', inc(r, r.sp)),
+        run=lambda r, m, o: set_register(r, 'sp', inc_u16(r, r.sp)),
     ),
     0x34: CPUInstruction(
         name='INC (HL)',
         length=1,
         cycles=12,
-        opcode=0x34
+        opcode=0x34,
+        run=lambda r, m, o: m.write_u8(r.hl, inc_u8(r, m.read(r.hl))),
     ),
     0x35: CPUInstruction(
         name='DEC (HL)',
         length=1,
         cycles=12,
         opcode=0x35,
-        run=lambda r, m, o: m.write_u8(r.hl, dec(r, m.read(r.hl))),
+        run=lambda r, m, o: m.write_u8(r.hl, dec_u8(r, m.read(r.hl))),
     ),
     0x36: CPUInstruction(
         name='LD (HL),u8',
         length=2,
         cycles=12,
-        opcode=0x36
+        opcode=0x36,
+        run=lambda r, m, o: m.write_u8(r.hl, o.to_word()),
     ),
     0x37: CPUInstruction(
         name='SCF',
@@ -639,28 +658,29 @@ opcodes = {
         name='LD A,(HL-)',
         length=1,
         cycles=8,
-        opcode=0x3a
+        opcode=0x3a,
+        run=lambda r, m, o: set_register(r, 'a', read_mem_dec_hl(r, m)),
     ),
     0x3b: CPUInstruction(
         name='DEC SP',
         length=1,
         cycles=8,
         opcode=0x3b,
-        run=lambda r, m, o: set_register(r, 'sp', dec(r, r.sp)),
+        run=lambda r, m, o: set_register(r, 'sp', dec_u16(r, r.sp)),
     ),
     0x3c: CPUInstruction(
         name='INC A',
         length=1,
         cycles=4,
         opcode=0x3c,
-        run=lambda r, m, o: set_register(r, 'a', inc(r, r.a)),
+        run=lambda r, m, o: set_register(r, 'a', inc_u8(r, r.a)),
     ),
     0x3d: CPUInstruction(
         name='DEC A',
         length=1,
         cycles=4,
         opcode=0x3d,
-        run=lambda r, m, o: set_register(r, 'a', dec(r, r.a)),
+        run=lambda r, m, o: set_register(r, 'a', dec_u8(r, r.a)),
     ),
     0x3e: CPUInstruction(
         name='LD A,u8',
