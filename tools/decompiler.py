@@ -2,17 +2,19 @@ import argparse
 from typing import Iterator
 
 from cpu.opcodes import opcodes
+from custom_types import u8
+from utils.bit_operations import combine_bytes
 from utils.files import read_binary_file
 
 
 def decompile(iterator: Iterator[int]) -> None:
     while True:
-        opcode = next(iterator, None)
+        opcode = u8(next(iterator, None))
         if opcode is None:
             return
 
         if is_prefixed_opcode(opcode):
-            opcode = opcode << 8 | next(iterator)
+            opcode = combine_bytes(opcode, u8(next(iterator)))
 
         instruction = opcodes[opcode]
         operand_bytes = bytes([next(iterator) for _ in range(instruction.args_length)])
@@ -24,7 +26,7 @@ def decompile(iterator: Iterator[int]) -> None:
             print(instruction)
 
 
-def is_prefixed_opcode(byte: int) -> bool:
+def is_prefixed_opcode(byte: u8) -> bool:
     return byte == 0xcb
 
 

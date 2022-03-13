@@ -8,9 +8,11 @@ from utils.files import read_binary_file
 def start(filename: str):
     memory = Memory()
     boot_rom_data = read_binary_file(filename)
-    memory.load_boot_rom(boot_rom_data)
+    #memory.load_boot_rom(boot_rom_data)
+    memory.load_rom(boot_rom_data)
 
     cpu = CPU(memory)
+    cpu.registers.pc = 0x100
     cpu.start()
 
 

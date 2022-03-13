@@ -1,8 +1,11 @@
 from dataclasses import dataclass
-from typing import Tuple
 
+from custom_types import u16
+from custom_types import u8
+from utils.bit_operations import combine_bytes
 from utils.bit_operations import get_bit
 from utils.bit_operations import set_bit
+from utils.bit_operations import split_bytes
 
 Z_FLAG_POSITION = 7
 N_FLAG_POSITION = 6
@@ -18,53 +21,54 @@ class Register:
         return getattr(instance, self.private_name, 0)
 
     def __set__(self, instance, value):
-        setattr(instance, self.private_name, value & 0xff)
+        # TODO: Combine registers into 16 bits and add check 0xffff
+        setattr(instance, self.private_name, value)
 
 
 @dataclass
 class Registers:
-    a: int = Register()
-    b: int = Register()
-    c: int = Register()
-    d: int = Register()
-    e: int = Register()
-    f: int = Register()
-    h: int = Register()
-    l: int = Register()
-    sp: int = Register()
-    pc: int = Register()
+    a: u8 = Register()
+    b: u8 = Register()
+    c: u8 = Register()
+    d: u8 = Register()
+    e: u8 = Register()
+    f: u8 = Register()
+    h: u8 = Register()
+    l: u8 = Register()
+    sp: u16 = Register()
+    pc: u16 = Register()
 
     @property
-    def af(self) -> int:
-        return self._combine_bytes(self.a, self.f)
+    def af(self) -> u16:
+        return combine_bytes(self.a, self.f)
 
     @af.setter
-    def af(self, value: int) -> None:
-        self.a, self.f = self._split_bytes(value)
+    def af(self, value: u16) -> None:
+        self.a, self.f = split_bytes(value)
 
     @property
-    def bc(self) -> int:
-        return self._combine_bytes(self.b, self.c)
+    def bc(self) -> u16:
+        return combine_bytes(self.b, self.c)
 
     @bc.setter
-    def bc(self, value: int) -> None:
-        self.b, self.c = self._split_bytes(value)
+    def bc(self, value: u16) -> None:
+        self.b, self.c = split_bytes(value)
 
     @property
-    def de(self) -> int:
-        return self._combine_bytes(self.d, self.e)
+    def de(self) -> u16:
+        return combine_bytes(self.d, self.e)
 
     @de.setter
-    def de(self, value: int) -> None:
-        self.d, self.e = self._split_bytes(value)
+    def de(self, value: u16) -> None:
+        self.d, self.e = split_bytes(value)
 
     @property
-    def hl(self) -> int:
-        return self._combine_bytes(self.h, self.l)
+    def hl(self) -> u16:
+        return combine_bytes(self.h, self.l)
 
     @hl.setter
-    def hl(self, value: int) -> None:
-        self.h, self.l = self._split_bytes(value)
+    def hl(self, value: u16) -> None:
+        self.h, self.l = split_bytes(value)
 
     @property
     def z_flag(self) -> bool:
@@ -99,15 +103,8 @@ class Registers:
         self._set_flag(C_FLAG_POSITION, value)
 
     def _set_flag(self, flag_position: int, value: bool) -> None:
-        self.f = set_bit(self.f, flag_position, int(value))
+        flags = set_bit(self.f, flag_position, int(value))
+        self.f = u8(flags)
 
     def _get_flag(self, flag_position: int) -> bool:
         return get_bit(self.f, flag_position) != 0
-
-    @staticmethod
-    def _combine_bytes(left: int, right: int) -> int:
-        return (left << 8) | right
-
-    @staticmethod
-    def _split_bytes(value: int) -> Tuple[int, int]:
-        return value >> 8, value & 0xff
