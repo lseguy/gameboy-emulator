@@ -108,3 +108,13 @@ class Registers:
 
     def _get_flag(self, flag_position: int) -> bool:
         return get_bit(self.f, flag_position) != 0
+
+    def __str__(self):
+        def to_hex(value: u16) -> str:
+            return f'{value:#06x}'
+
+        return (
+            f'AF={to_hex(self.af)}, BC={to_hex(self.bc)}, DE={to_hex(self.de)}, HL={to_hex(self.hl)}\n'
+            f'SP={to_hex(self.sp)}, PC={to_hex(self.pc)}\n'
+            f'Z={self.z_flag}, N={self.n_flag}, H={self.h_flag}, C={self.c_flag}'
+        )

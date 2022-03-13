@@ -37,7 +37,7 @@ class Memory:
         # Blargg serial test output
         if address == 0xff02 and value == 0x81:
             print(chr(self.content[0xff01]), end='')
-            #self.content[0xff02] = 0x0
+            # self.content[0xff02] = 0x0
 
     def write_u16(self, address: u16, value: u16) -> None:
         self._raise_for_invalid_address(address)
@@ -68,5 +68,5 @@ class Memory:
     def __repr__(self) -> str:
         return self._dump_memory(0, len(self.content))
 
-    def _dump_memory(self, start: int, end: int) -> str:
+    def dump_memory(self, start: int, end: int) -> str:
         return '\n'.join([f'{hex(i)} {self.content[i:i+16].hex(" ")}' for i in range(start, end, 16)])

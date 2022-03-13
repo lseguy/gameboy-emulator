@@ -1,6 +1,7 @@
 from cpu.instruction import CPUInstruction
 from cpu.instruction import Operands
 from custom_types import u16
+from debugger import Debugger
 from mmu.memory import Memory
 from cpu.opcodes import opcodes
 from cpu.registers import Registers
@@ -9,9 +10,20 @@ from utils.bit_operations import combine_bytes
 
 
 class CPU:
-    def __init__(self, memory: Memory):
+    def __init__(self, memory: Memory, enable_debugger: bool):
         self.memory = memory
         self.registers = Registers()
+
+        self.debugger = Debugger(self.registers, self.memory, enable_debugger)
+
+        # Skip the bootrom for now and start directly with cartridge data
+        self.registers.pc = 0x100
+        self.registers.a = 0x11
+        self.registers.f = 0x80
+        self.registers.d = 0xff
+        self.registers.e = 0x56
+        self.registers.l = 0x0d
+        self.registers.sp = 0xfffe
 
     def start(self) -> None:
         while True:
@@ -23,13 +35,8 @@ class CPU:
             else:
                 args = None
 
-            # if args:
-            #     print(f'{instruction} ${args}')
-            # else:
-            #     print(instruction)
-
+            self.debugger.debug(instruction, args)
             self.execute(instruction, args)
-            #print(self.registers)
 
     def fetch(self) -> u8:
         data = self.memory.read(self.registers.pc)
