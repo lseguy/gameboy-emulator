@@ -27,7 +27,7 @@ class Debugger:
         else:
             print(f'{GREEN}{instruction}{RESET}')
 
-        if self.jump_address and self.registers.pc < self.jump_address:
+        if self.jump_address and self.registers.pc != self.jump_address:
             return
         self.jump_address = None
 
@@ -61,7 +61,7 @@ class Debugger:
 
         while not address:
             try:
-                address = int(input('minimum hex address of PC to stop: '), 16)
+                address = int(input('exact hex address of PC to stop: '), 16)
             except ValueError:
                 pass
 

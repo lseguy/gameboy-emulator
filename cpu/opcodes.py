@@ -66,14 +66,19 @@ def logical_and(registers: Registers, lhs: u8, rhs: u8) -> None:
     registers.c_flag = False
 
 
-def subtract_u8(registers: Registers, lhs: u8, rhs: u8) -> None:
+def subtract_u8(registers: Registers, lhs: u8, rhs: u8) -> u8:
     result = (lhs - rhs) & 0xff
     # The result always goes into register A
-    registers.a = u8(result)
     registers.z_flag = result == 0
     registers.n_flag = True
     registers.h_flag = (rhs & 0x0f) > (lhs & 0x0f)
     registers.c_flag = rhs > lhs
+
+    return u8(result)
+
+
+def compare(registers: Registers, value: u8) -> None:
+    subtract_u8(registers, registers.a, value)
 
 
 def test_bit(registers: Registers, byte: int, bit_position: int) -> None:
@@ -93,12 +98,22 @@ def swap(registers: Registers, byte: u8) -> u8:
     return u8(result)
 
 
+def add_sp(registers: Registers, offset: i8) -> u16:
+    result = (registers.sp + offset) & 0xffff
+    registers.z_flag = False
+    registers.n_flag = False
+    registers.h_flag = (result & 0xf) <= (registers.sp & 0xf)
+    registers.c_flag = (result & 0xff) < (registers.sp & 0xff)
+
+    return u16(result)
+
+
 def add_u8(registers: Registers, lhs: u8, rhs: u8) -> u8:
     result = (lhs + rhs) & 0xff
 
     registers.z_flag = result == 0
     registers.n_flag = False
-    registers.h_flag = (lhs & 0x0f) + (lhs & 0x0f) > 0x0f
+    registers.h_flag = (lhs & 0x0f) + (rhs & 0x0f) > 0x0f
     registers.c_flag = (lhs + rhs) > 0xff
 
     return u8(result)
@@ -114,7 +129,7 @@ def add_u16(registers: Registers, lhs: u16, rhs: u16) -> u16:
     result = (lhs + rhs) & 0xffff
 
     registers.n_flag = False
-    registers.h_flag = (lhs & 0x0fff) + (lhs & 0x0fff) > 0x0fff
+    registers.h_flag = (lhs & 0x0fff) + (rhs & 0x0fff) > 0x0fff
     registers.c_flag = (lhs + rhs) > 0xffff
 
     return u16(result)
@@ -131,10 +146,7 @@ def inc_u8(registers: Registers, value: u8) -> u8:
 
 def inc_u16(registers: Registers, value: u16) -> u16:
     result = (value + 1) & 0xffff
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = (0x0f & result) < (0x0f & value)
-
+    # Flags are not affected for increments on u16 registers
     return u16(result)
 
 
@@ -149,10 +161,7 @@ def dec_u8(registers: Registers, value: u8) -> u8:
 
 def dec_u16(registers: Registers, value: u16) -> u16:
     result = (value - 1) & 0xffff
-    registers.z_flag = result == 0
-    registers.n_flag = True
-    registers.h_flag = (0x0f & value) == 0
-
+    # Flags are not affected for decrements on u16 registers
     return u16(result)
 
 
@@ -161,7 +170,7 @@ def rotate_left(registers: Registers, value: u8, through_carry: bool = False) ->
     msb = get_bit(value, 7)
 
     if through_carry:
-        result |= 0x1 if registers.c else 0x0
+        result |= 0x1 if registers.c_flag else 0x0
     else:
         result |= msb
 
@@ -178,7 +187,7 @@ def rotate_right(registers: Registers, value: u8, through_carry: bool = False) -
     lsb = get_bit(value, 0)
 
     if through_carry:
-        result = set_bit(result, 7, 0x1 if registers.c else 0x0)
+        result = set_bit(result, 7, 0x1 if registers.c_flag else 0x0)
     else:
         result = set_bit(result, 7, lsb)
 
@@ -201,13 +210,14 @@ def shift_right(registers: Registers, value: u8) -> u8:
     return u8(result)
 
 
-def relative_conditional_jump(registers: Registers, condition: bool, offset: i8) -> None:
+def jump(registers: Registers, dest: u16, condition: bool = True) -> None:
     if condition:
-        relative_jump(registers, offset)
+        registers.pc = dest
 
 
-def relative_jump(registers: Registers, offset: i8) -> None:
-    registers.pc = u16(registers.pc + offset)
+def relative_jump(registers: Registers, offset: i8, condition: bool = True) -> None:
+    if condition:
+        registers.pc = u16(registers.pc + offset)
 
 
 def call(registers: Registers, memory: Memory, dest: u16, condition: bool = True) -> None:
@@ -480,7 +490,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0x20,
-        run=lambda r, m, o: relative_conditional_jump(r, not r.z_flag, o.to_signed_word()),
+        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=not r.z_flag),
     ),
     0x21: CPUInstruction(
         name='LD HL,u16',
@@ -535,7 +545,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0x28,
-        run=lambda r, m, o: relative_conditional_jump(r, r.z_flag, o.to_signed_word()),
+        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=r.z_flag),
     ),
     0x29: CPUInstruction(
         name='ADD HL,HL',
@@ -590,7 +600,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0x30,
-        run=lambda r, m, o: relative_conditional_jump(r, not r.c_flag, o.to_signed_word()),
+        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=not r.c_flag),
     ),
     0x31: CPUInstruction(
         name='LD SP,u16',
@@ -645,7 +655,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0x38,
-        run=lambda r, m, o: relative_conditional_jump(r, r.c_flag, o.to_signed_word()),
+        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=r.c_flag),
     ),
     0x39: CPUInstruction(
         name='ADD HL,SP',
@@ -1525,7 +1535,8 @@ opcodes = {
         name='CP A,E',
         length=1,
         cycles=4,
-        opcode=0xbb
+        opcode=0xbb,
+        run=lambda r, m, o: compare(r, r.e),
     ),
     0xbc: CPUInstruction(
         name='CP A,H',
@@ -1568,7 +1579,8 @@ opcodes = {
         name='JP NZ,u16',
         length=3,
         cycles=12,
-        opcode=0xc2
+        opcode=0xc2,
+        run=lambda r, m, o: jump(r, o.to_dword(), condition=not r.z_flag),
     ),
     0xc3: CPUInstruction(
         name='JP u16',
@@ -1701,7 +1713,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0xd6,
-        run=lambda r, m, o: subtract_u8(r, r.a, o.to_word()),
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, o.to_word())),
     ),
     0xd7: CPUInstruction(
         name='RST 10h',
@@ -1816,6 +1828,7 @@ opcodes = {
         length=2,
         cycles=16,
         opcode=0xe8,
+        run=lambda r, m, o: set_register(r, 'sp', add_sp(r, o.to_signed_word())),
     ),
     0xe9: CPUInstruction(
         name='JP HL',
@@ -1874,7 +1887,7 @@ opcodes = {
         length=1,
         cycles=12,
         opcode=0xf1,
-        run=lambda r, m, o: set_register(r, 'af', pop_stack(r, m)),
+        run=lambda r, m, o: set_register(r, 'af', pop_stack(r, m) & 0xfff0),  # last 4 bits of F register are always 0
     ),
     0xf2: CPUInstruction(
         name='LD A,(FF00+C)',
@@ -1919,6 +1932,7 @@ opcodes = {
         length=2,
         cycles=12,
         opcode=0xf8,
+        run=lambda r, m, o: set_register(r, 'hl', add_sp(r, o.to_signed_word())),
     ),
     0xf9: CPUInstruction(
         name='LD SP,HL',
@@ -1957,7 +1971,7 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0xfe,
-        run=lambda r, m, o: subtract_u8(r, r.a, o.to_word()),
+        run=lambda r, m, o: compare(r, o.to_word()),
     ),
     0xff: CPUInstruction(
         name='RST 38h',
