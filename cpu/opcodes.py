@@ -77,6 +77,18 @@ def subtract_u8(registers: Registers, lhs: u8, rhs: u8) -> u8:
     return u8(result)
 
 
+def subtract_u8_with_carry(registers: Registers, lhs: u8, rhs: u8) -> u8:
+    carry = int(registers.c_flag)
+    result = (lhs - rhs - carry) & 0xff
+
+    registers.z_flag = result == 0
+    registers.n_flag = True
+    registers.h_flag = ((rhs & 0x0f) + carry) > (lhs & 0x0f)
+    registers.c_flag = rhs + carry > lhs
+
+    return u8(result)
+
+
 def compare(registers: Registers, value: u8) -> None:
     subtract_u8(registers, registers.a, value)
 
@@ -120,7 +132,13 @@ def add_u8(registers: Registers, lhs: u8, rhs: u8) -> u8:
 
 
 def add_u8_with_carry(registers: Registers, lhs: u8, rhs: u8) -> u8:
-    result = add_u8(registers, lhs, u8(rhs + int(registers.c_flag)))
+    carry = int(registers.c_flag)
+    result = (lhs + rhs + carry) & 0xff
+
+    registers.z_flag = result == 0
+    registers.n_flag = False
+    registers.h_flag = (lhs & 0x0f) + (rhs & 0x0f) + carry > 0x0f
+    registers.c_flag = (lhs + rhs + carry) > 0xff
 
     return u8(result)
 
@@ -144,7 +162,7 @@ def inc_u8(registers: Registers, value: u8) -> u8:
     return u8(result)
 
 
-def inc_u16(registers: Registers, value: u16) -> u16:
+def inc_u16(value: u16) -> u16:
     result = (value + 1) & 0xffff
     # Flags are not affected for increments on u16 registers
     return u16(result)
@@ -159,13 +177,31 @@ def dec_u8(registers: Registers, value: u8) -> u8:
     return u8(result)
 
 
-def dec_u16(registers: Registers, value: u16) -> u16:
+def dec_u16(value: u16) -> u16:
     result = (value - 1) & 0xffff
     # Flags are not affected for decrements on u16 registers
     return u16(result)
 
 
-def rotate_left(registers: Registers, value: u8, through_carry: bool = False) -> u8:
+def complement(registers: Registers) -> None:
+    registers.a = ~registers.a & 0xff
+    registers.n_flag = True
+    registers.h_flag = True
+
+
+def complement_carry_flag(registers: Registers) -> None:
+    registers.c_flag = not registers.c_flag
+    registers.n_flag = False
+    registers.h_flag = False
+
+
+def set_carry_flag(registers: Registers) -> None:
+    registers.c_flag = True
+    registers.n_flag = False
+    registers.h_flag = False
+
+
+def rotate_left(registers: Registers, value: u8, through_carry: bool = False, reset_z_flag: bool = False) -> u8:
     result = (value << 1) & 0xff
     msb = get_bit(value, 7)
 
@@ -174,7 +210,10 @@ def rotate_left(registers: Registers, value: u8, through_carry: bool = False) ->
     else:
         result |= msb
 
-    registers.z_flag = result == 0
+    if reset_z_flag:
+        registers.z_flag = False
+    else:
+        registers.z_flag = result == 0
     registers.n_flag = False
     registers.h_flag = False
     registers.c_flag = msb != 0
@@ -182,7 +221,7 @@ def rotate_left(registers: Registers, value: u8, through_carry: bool = False) ->
     return u8(result)
 
 
-def rotate_right(registers: Registers, value: u8, through_carry: bool = False) -> u8:
+def rotate_right(registers: Registers, value: u8, through_carry: bool = False, reset_z_flag: bool = False) -> u8:
     result = value >> 1
     lsb = get_bit(value, 0)
 
@@ -191,7 +230,10 @@ def rotate_right(registers: Registers, value: u8, through_carry: bool = False) -
     else:
         result = set_bit(result, 7, lsb)
 
-    registers.z_flag = result == 0
+    if reset_z_flag:
+        registers.z_flag = False
+    else:
+        registers.z_flag = result == 0
     registers.n_flag = False
     registers.h_flag = False
     registers.c_flag = lsb != 0
@@ -199,13 +241,38 @@ def rotate_right(registers: Registers, value: u8, through_carry: bool = False) -
     return u8(result)
 
 
-def shift_right(registers: Registers, value: u8) -> u8:
+def shift_right_logical(registers: Registers, value: u8) -> u8:
     result = value >> 1
 
     registers.z_flag = result == 0
     registers.n_flag = False
     registers.h_flag = False
     registers.c_flag = value & 0x1 != 0
+
+    return u8(result)
+
+
+def shift_right_arithmetic(registers: Registers, value: u8) -> u8:
+    result = value >> 1
+
+    msb = value >> 7
+    result = set_bit(result, 7, msb)
+
+    registers.z_flag = result == 0
+    registers.n_flag = False
+    registers.h_flag = False
+    registers.c_flag = value & 0x1 != 0
+
+    return u8(result)
+
+
+def shift_left(registers: Registers, value: u8) -> u8:
+    result = (value << 1) & 0xff
+
+    registers.z_flag = result == 0
+    registers.n_flag = False
+    registers.h_flag = False
+    registers.c_flag = get_bit(value, 7) != 0
 
     return u8(result)
 
@@ -232,10 +299,21 @@ def disable_interrupts(memory: Memory) -> None:
     pass
 
 
+def enable_interrupts(memory: Memory) -> None:
+    # TODO: Implement delay
+    memory.ime = True
+    pass
+
+
 def ret(registers: Registers, memory: Memory, condition: bool = True) -> None:
     if condition:
         dest = pop_stack(registers, memory)
         registers.pc = dest
+
+
+def reti(registers: Registers, memory: Memory) -> None:
+    ret(registers, memory)
+    enable_interrupts(memory)
 
 
 def push_stack(registers: Registers, memory: Memory, value: u16) -> None:
@@ -254,6 +332,33 @@ def pop_stack(registers: Registers, memory: Memory) -> u16:
     registers.sp = u16(registers.sp + 1)
 
     return combine_bytes(msb, lsb)
+
+
+def restart(registers: Registers, memory: Memory, dest: u16) -> None:
+    push_stack(registers, memory, registers.pc)
+    jump(registers, dest)
+
+
+def daa(registers: Registers) -> None:
+    result = registers.a
+
+    if registers.n_flag:
+        if registers.h_flag:
+            result -= 0x06
+        if registers.c_flag:
+            result -= 0x60
+    else:
+        if (result & 0x0f) > 9 or registers.h_flag:
+            result += 0x06
+        if result > 0x9f or registers.c_flag:
+            result += 0x60
+            registers.c_flag = True
+
+    result &= 0xff
+    registers.z_flag = result == 0
+    registers.h_flag = False
+
+    registers.a = result
 
 
 def noop(*args) -> None:
@@ -287,7 +392,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x03,
-        run=lambda r, m, o: set_register(r, 'bc', inc_u16(r, r.bc)),
+        run=lambda r, m, o: set_register(r, 'bc', inc_u16(r.bc)),
     ),
     0x04: CPUInstruction(
         name='INC B',
@@ -315,7 +420,7 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0x07,
-        run=lambda r, m, o: set_register(r, 'a', rotate_left(r, r.a)),
+        run=lambda r, m, o: set_register(r, 'a', rotate_left(r, r.a, reset_z_flag=True)),
     ),
     0x08: CPUInstruction(
         name='LD (u16),SP',
@@ -343,7 +448,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x0b,
-        run=lambda r, m, o: set_register(r, 'bc', dec_u16(r, r.bc)),
+        run=lambda r, m, o: set_register(r, 'bc', dec_u16(r.bc)),
     ),
     0x0c: CPUInstruction(
         name='INC C',
@@ -371,14 +476,13 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0x0f,
-        run=lambda r, m, o: set_register(r, 'a', rotate_right(r, r.a)),
+        run=lambda r, m, o: set_register(r, 'a', rotate_right(r, r.a, reset_z_flag=True)),
     ),
     0x10: CPUInstruction(
         name='STOP',
         length=1,
         cycles=4,
-        opcode=0x10,
-        run=noop,
+        opcode=0x10
     ),
     0x11: CPUInstruction(
         name='LD DE,u16',
@@ -399,7 +503,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x13,
-        run=lambda r, m, o: set_register(r, 'de', inc_u16(r, r.de)),
+        run=lambda r, m, o: set_register(r, 'de', inc_u16(r.de)),
     ),
     0x14: CPUInstruction(
         name='INC D',
@@ -427,7 +531,7 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0x17,
-        run=lambda r, m, o: set_register(r, 'a', rotate_left(r, r.a, through_carry=True)),
+        run=lambda r, m, o: set_register(r, 'a', rotate_left(r, r.a, through_carry=True, reset_z_flag=True)),
     ),
     0x18: CPUInstruction(
         name='JR i8',
@@ -455,7 +559,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x1b,
-        run=lambda r, m, o: set_register(r, 'de', dec_u16(r, r.de)),
+        run=lambda r, m, o: set_register(r, 'de', dec_u16(r.de)),
     ),
     0x1c: CPUInstruction(
         name='INC E',
@@ -483,7 +587,7 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0x1f,
-        run=lambda r, m, o: set_register(r, 'a', rotate_right(r, r.a, through_carry=True)),
+        run=lambda r, m, o: set_register(r, 'a', rotate_right(r, r.a, through_carry=True, reset_z_flag=True)),
     ),
     0x20: CPUInstruction(
         name='JR NZ,i8',
@@ -511,7 +615,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x23,
-        run=lambda r, m, o: set_register(r, 'hl', inc_u16(r, r.hl)),
+        run=lambda r, m, o: set_register(r, 'hl', inc_u16(r.hl)),
     ),
     0x24: CPUInstruction(
         name='INC H',
@@ -538,7 +642,8 @@ opcodes = {
         name='DAA',
         length=1,
         cycles=4,
-        opcode=0x27
+        opcode=0x27,
+        run=lambda r, m, o: daa(r),
     ),
     0x28: CPUInstruction(
         name='JR Z,i8',
@@ -566,7 +671,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x2b,
-        run=lambda r, m, o: set_register(r, 'hl', dec_u16(r, r.hl)),
+        run=lambda r, m, o: set_register(r, 'hl', dec_u16(r.hl)),
     ),
     0x2c: CPUInstruction(
         name='INC L',
@@ -593,7 +698,8 @@ opcodes = {
         name='CPL',
         length=1,
         cycles=4,
-        opcode=0x2f
+        opcode=0x2f,
+        run=lambda r, m, o: complement(r),
     ),
     0x30: CPUInstruction(
         name='JR NC,i8',
@@ -621,7 +727,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x33,
-        run=lambda r, m, o: set_register(r, 'sp', inc_u16(r, r.sp)),
+        run=lambda r, m, o: set_register(r, 'sp', inc_u16(r.sp)),
     ),
     0x34: CPUInstruction(
         name='INC (HL)',
@@ -648,7 +754,8 @@ opcodes = {
         name='SCF',
         length=1,
         cycles=4,
-        opcode=0x37
+        opcode=0x37,
+        run=lambda r, m, o: set_carry_flag(r),
     ),
     0x38: CPUInstruction(
         name='JR C,i8',
@@ -676,7 +783,7 @@ opcodes = {
         length=1,
         cycles=8,
         opcode=0x3b,
-        run=lambda r, m, o: set_register(r, 'sp', dec_u16(r, r.sp)),
+        run=lambda r, m, o: set_register(r, 'sp', dec_u16(r.sp)),
     ),
     0x3c: CPUInstruction(
         name='INC A',
@@ -703,7 +810,8 @@ opcodes = {
         name='CCF',
         length=1,
         cycles=4,
-        opcode=0x3f
+        opcode=0x3f,
+        run=lambda r, m, o: complement_carry_flag(r),
     ),
     0x40: CPUInstruction(
         name='LD B,B',
@@ -1213,174 +1321,203 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0x88,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, r.b)),
     ),
     0x89: CPUInstruction(
         name='ADC A,C',
         length=1,
         cycles=4,
         opcode=0x89,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, r.c)),
     ),
     0x8a: CPUInstruction(
         name='ADC A,D',
         length=1,
         cycles=4,
-        opcode=0x8a
+        opcode=0x8a,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, r.d)),
     ),
     0x8b: CPUInstruction(
         name='ADC A,E',
         length=1,
         cycles=4,
-        opcode=0x8b
+        opcode=0x8b,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, r.e)),
     ),
     0x8c: CPUInstruction(
         name='ADC A,H',
         length=1,
         cycles=4,
-        opcode=0x8c
+        opcode=0x8c,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, r.h)),
     ),
     0x8d: CPUInstruction(
         name='ADC A,L',
         length=1,
         cycles=4,
-        opcode=0x8d
+        opcode=0x8d,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, r.l)),
     ),
     0x8e: CPUInstruction(
         name='ADC A,(HL)',
         length=1,
         cycles=8,
-        opcode=0x8e
+        opcode=0x8e,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, m.read(r.hl))),
     ),
     0x8f: CPUInstruction(
         name='ADC A,A',
         length=1,
         cycles=4,
-        opcode=0x8f
+        opcode=0x8f,
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, r.a)),
     ),
     0x90: CPUInstruction(
         name='SUB A,B',
         length=1,
         cycles=4,
-        opcode=0x90
+        opcode=0x90,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, r.b)),
     ),
     0x91: CPUInstruction(
         name='SUB A,C',
         length=1,
         cycles=4,
-        opcode=0x91
+        opcode=0x91,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, r.c)),
     ),
     0x92: CPUInstruction(
         name='SUB A,D',
         length=1,
         cycles=4,
-        opcode=0x92
+        opcode=0x92,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, r.d)),
     ),
     0x93: CPUInstruction(
         name='SUB A,E',
         length=1,
         cycles=4,
-        opcode=0x93
+        opcode=0x93,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, r.e)),
     ),
     0x94: CPUInstruction(
         name='SUB A,H',
         length=1,
         cycles=4,
-        opcode=0x94
+        opcode=0x94,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, r.h)),
     ),
     0x95: CPUInstruction(
         name='SUB A,L',
         length=1,
         cycles=4,
-        opcode=0x95
+        opcode=0x95,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, r.l)),
     ),
     0x96: CPUInstruction(
         name='SUB A,(HL)',
         length=1,
         cycles=8,
-        opcode=0x96
+        opcode=0x96,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, m.read(r.hl))),
     ),
     0x97: CPUInstruction(
         name='SUB A,A',
         length=1,
         cycles=4,
-        opcode=0x97
+        opcode=0x97,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, r.a)),
     ),
     0x98: CPUInstruction(
         name='SBC A,B',
         length=1,
         cycles=4,
-        opcode=0x98
+        opcode=0x98,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, r.b)),
     ),
     0x99: CPUInstruction(
         name='SBC A,C',
         length=1,
         cycles=4,
-        opcode=0x99
+        opcode=0x99,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, r.c)),
     ),
     0x9a: CPUInstruction(
         name='SBC A,D',
         length=1,
         cycles=4,
-        opcode=0x9a
+        opcode=0x9a,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, r.d)),
     ),
     0x9b: CPUInstruction(
         name='SBC A,E',
         length=1,
         cycles=4,
-        opcode=0x9b
+        opcode=0x9b,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, r.e)),
     ),
     0x9c: CPUInstruction(
         name='SBC A,H',
         length=1,
         cycles=4,
-        opcode=0x9c
+        opcode=0x9c,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, r.h)),
     ),
     0x9d: CPUInstruction(
         name='SBC A,L',
         length=1,
         cycles=4,
-        opcode=0x9d
+        opcode=0x9d,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, r.l)),
     ),
     0x9e: CPUInstruction(
         name='SBC A,(HL)',
         length=1,
         cycles=8,
-        opcode=0x9e
+        opcode=0x9e,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, m.read(r.hl))),
     ),
     0x9f: CPUInstruction(
         name='SBC A,A',
         length=1,
         cycles=4,
-        opcode=0x9f
+        opcode=0x9f,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, r.a)),
     ),
     0xa0: CPUInstruction(
         name='AND A,B',
         length=1,
         cycles=4,
-        opcode=0xa0
+        opcode=0xa0,
+        run=lambda r, m, o: logical_and(r, r.a, r.b),
     ),
     0xa1: CPUInstruction(
         name='AND A,C',
         length=1,
         cycles=4,
-        opcode=0xa1
+        opcode=0xa1,
+        run=lambda r, m, o: logical_and(r, r.a, r.c),
     ),
     0xa2: CPUInstruction(
         name='AND A,D',
         length=1,
         cycles=4,
-        opcode=0xa2
+        opcode=0xa2,
+        run=lambda r, m, o: logical_and(r, r.a, r.d),
     ),
     0xa3: CPUInstruction(
         name='AND A,E',
         length=1,
         cycles=4,
-        opcode=0xa3
+        opcode=0xa3,
+        run=lambda r, m, o: logical_and(r, r.a, r.e),
     ),
     0xa4: CPUInstruction(
         name='AND A,H',
         length=1,
         cycles=4,
-        opcode=0xa4
+        opcode=0xa4,
+        run=lambda r, m, o: logical_and(r, r.a, r.h),
     ),
     0xa5: CPUInstruction(
         name='AND A,L',
@@ -1393,13 +1530,15 @@ opcodes = {
         name='AND A,(HL)',
         length=1,
         cycles=8,
-        opcode=0xa6
+        opcode=0xa6,
+        run=lambda r, m, o: logical_and(r, r.a, m.read(r.hl)),
     ),
     0xa7: CPUInstruction(
         name='AND A,A',
         length=1,
         cycles=4,
-        opcode=0xa7
+        opcode=0xa7,
+        run=lambda r, m, o: logical_and(r, r.a, r.a),
     ),
     0xa8: CPUInstruction(
         name='XOR A,B',
@@ -1517,20 +1656,23 @@ opcodes = {
         name='CP A,B',
         length=1,
         cycles=4,
-        opcode=0xb8
+        opcode=0xb8,
+        run=lambda r, m, o: compare(r, r.b),
     ),
     0xb9: CPUInstruction(
         name='CP A,C',
         length=1,
         cycles=4,
-        opcode=0xb9
+        opcode=0xb9,
+        run=lambda r, m, o: compare(r, r.c),
     ),
     0xba: CPUInstruction(
         name='CP A,D',
         length=1,
         cycles=4,
-        opcode=0xba
-    ),
+        opcode=0xba,
+        run=lambda r, m, o: compare(r, r.d),
+),
     0xbb: CPUInstruction(
         name='CP A,E',
         length=1,
@@ -1542,31 +1684,36 @@ opcodes = {
         name='CP A,H',
         length=1,
         cycles=4,
-        opcode=0xbc
+        opcode=0xbc,
+        run=lambda r, m, o: compare(r, r.h),
     ),
     0xbd: CPUInstruction(
         name='CP A,L',
         length=1,
         cycles=4,
-        opcode=0xbd
+        opcode=0xbd,
+        run=lambda r, m, o: compare(r, r.l),
     ),
     0xbe: CPUInstruction(
         name='CP A,(HL)',
         length=1,
         cycles=8,
-        opcode=0xbe
+        opcode=0xbe,
+        run=lambda r, m, o: compare(r, m.read(r.hl)),
     ),
     0xbf: CPUInstruction(
         name='CP A,A',
         length=1,
         cycles=4,
-        opcode=0xbf
+        opcode=0xbf,
+        run=lambda r, m, o: compare(r, r.a),
     ),
     0xc0: CPUInstruction(
         name='RET NZ',
         length=1,
         cycles=8,
-        opcode=0xc0
+        opcode=0xc0,
+        run=lambda r, m, o: ret(r, m, condition=not r.z_flag),
     ),
     0xc1: CPUInstruction(
         name='POP BC',
@@ -1614,7 +1761,8 @@ opcodes = {
         name='RST 00h',
         length=1,
         cycles=16,
-        opcode=0xc7
+        opcode=0xc7,
+        run=lambda r, m, o: restart(r, m, u16(0x00)),
     ),
     0xc8: CPUInstruction(
         name='RET Z',
@@ -1634,7 +1782,8 @@ opcodes = {
         name='JP Z,u16',
         length=3,
         cycles=12,
-        opcode=0xca
+        opcode=0xca,
+        run=lambda r, m, o: jump(r, o.to_dword(), condition=r.z_flag),
     ),
     0xcb: CPUInstruction(
         name='PREFIX CB',
@@ -1667,7 +1816,8 @@ opcodes = {
         name='RST 08h',
         length=1,
         cycles=16,
-        opcode=0xcf
+        opcode=0xcf,
+        run=lambda r, m, o: restart(r, m, u16(0x08)),
     ),
     0xd0: CPUInstruction(
         name='RET NC',
@@ -1687,7 +1837,8 @@ opcodes = {
         name='JP NC,u16',
         length=3,
         cycles=12,
-        opcode=0xd2
+        opcode=0xd2,
+        run=lambda r, m, o: jump(r, o.to_dword(), condition=not r.c_flag),
     ),
     0xd3: CPUInstruction(
         name='UNUSED',
@@ -1699,7 +1850,8 @@ opcodes = {
         name='CALL NC,u16',
         length=3,
         cycles=12,
-        opcode=0xd4
+        opcode=0xd4,
+        run=lambda r, m, o: call(r, m, o.to_dword(), condition=not r.c_flag),
     ),
     0xd5: CPUInstruction(
         name='PUSH DE',
@@ -1719,7 +1871,8 @@ opcodes = {
         name='RST 10h',
         length=1,
         cycles=16,
-        opcode=0xd7
+        opcode=0xd7,
+        run=lambda r, m, o: restart(r, m, u16(0x10)),
     ),
     0xd8: CPUInstruction(
         name='RET C',
@@ -1732,13 +1885,15 @@ opcodes = {
         name='RETI',
         length=1,
         cycles=16,
-        opcode=0xd9
+        opcode=0xd9,
+        run=lambda r, m, o: reti(r, m),
     ),
     0xda: CPUInstruction(
         name='JP C,u16',
         length=3,
         cycles=12,
-        opcode=0xda
+        opcode=0xda,
+        run=lambda r, m, o: jump(r, o.to_dword(), condition=r.c_flag),
     ),
     0xdb: CPUInstruction(
         name='UNUSED',
@@ -1750,7 +1905,8 @@ opcodes = {
         name='CALL C,u16',
         length=3,
         cycles=12,
-        opcode=0xdc
+        opcode=0xdc,
+        run=lambda r, m, o: call(r, m, o.to_dword(), condition=r.c_flag),
     ),
     0xdd: CPUInstruction(
         name='UNUSED',
@@ -1762,13 +1918,15 @@ opcodes = {
         name='SBC A,u8',
         length=2,
         cycles=8,
-        opcode=0xde
+        opcode=0xde,
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, o.to_word())),
     ),
     0xdf: CPUInstruction(
         name='RST 18h',
         length=1,
         cycles=16,
-        opcode=0xdf
+        opcode=0xdf,
+        run=lambda r, m, o: restart(r, m, u16(0x18)),
     ),
     0xe0: CPUInstruction(
         name='LD (FF00+u8),A',
@@ -1821,7 +1979,8 @@ opcodes = {
         name='RST 20h',
         length=1,
         cycles=16,
-        opcode=0xe7
+        opcode=0xe7,
+        run=lambda r, m, o: restart(r, m, u16(0x20)),
     ),
     0xe8: CPUInstruction(
         name='ADD SP,i8',
@@ -1873,7 +2032,8 @@ opcodes = {
         name='RST 28h',
         length=1,
         cycles=16,
-        opcode=0xef
+        opcode=0xef,
+        run=lambda r, m, o: restart(r, m, u16(0x28)),
     ),
     0xf0: CPUInstruction(
         name='LD A,(FF00+u8)',
@@ -1893,7 +2053,8 @@ opcodes = {
         name='LD A,(FF00+C)',
         length=1,
         cycles=8,
-        opcode=0xf2
+        opcode=0xf2,
+        run=lambda r, m, o: set_register(r, 'a', m.read(u16(0xff00 + r.c))),
     ),
     0xf3: CPUInstruction(
         name='DI',
@@ -1919,13 +2080,15 @@ opcodes = {
         name='OR A,u8',
         length=2,
         cycles=8,
-        opcode=0xf6
+        opcode=0xf6,
+        run=lambda r, m, o: logical_or(r, r.a, o.to_word()),
     ),
     0xf7: CPUInstruction(
         name='RST 30h',
         length=1,
         cycles=16,
-        opcode=0xf7
+        opcode=0xf7,
+        run=lambda r, m, o: restart(r, m, u16(0x30)),
     ),
     0xf8: CPUInstruction(
         name='LD HL,SP+i8',
@@ -1952,7 +2115,8 @@ opcodes = {
         name='EI',
         length=1,
         cycles=4,
-        opcode=0xfb
+        opcode=0xfb,
+        run=lambda r, m, o: enable_interrupts(m),
     ),
     0xfc: CPUInstruction(
         name='UNUSED',
@@ -1977,109 +2141,127 @@ opcodes = {
         name='RST 38h',
         length=1,
         cycles=16,
-        opcode=0xff
+        opcode=0xff,
+        run=lambda r, m, o: restart(r, m, u16(0x38)),
     ),
     0xcb00: CPUInstruction(
         name='RLC B',
         length=2,
         cycles=8,
-        opcode=0xcb00
+        opcode=0xcb00,
+        run=lambda r, m, o: set_register(r, 'b', rotate_left(r, r.b)),
     ),
     0xcb01: CPUInstruction(
         name='RLC C',
         length=2,
         cycles=8,
-        opcode=0xcb01
+        opcode=0xcb01,
+        run=lambda r, m, o: set_register(r, 'c', rotate_left(r, r.c)),
     ),
     0xcb02: CPUInstruction(
         name='RLC D',
         length=2,
         cycles=8,
-        opcode=0xcb02
+        opcode=0xcb02,
+        run=lambda r, m, o: set_register(r, 'd', rotate_left(r, r.d)),
     ),
     0xcb03: CPUInstruction(
         name='RLC E',
         length=2,
         cycles=8,
-        opcode=0xcb03
+        opcode=0xcb03,
+        run=lambda r, m, o: set_register(r, 'e', rotate_left(r, r.e)),
     ),
     0xcb04: CPUInstruction(
         name='RLC H',
         length=2,
         cycles=8,
-        opcode=0xcb04
+        opcode=0xcb04,
+        run=lambda r, m, o: set_register(r, 'h', rotate_left(r, r.h)),
     ),
     0xcb05: CPUInstruction(
         name='RLC L',
         length=2,
         cycles=8,
-        opcode=0xcb05
+        opcode=0xcb05,
+        run=lambda r, m, o: set_register(r, 'l', rotate_left(r, r.l)),
     ),
     0xcb06: CPUInstruction(
         name='RLC (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb06
+        opcode=0xcb06,
+        run=lambda r, m, o: m.write_u8(r.hl, rotate_left(r, m.read(r.hl))),
     ),
     0xcb07: CPUInstruction(
         name='RLC A',
         length=2,
         cycles=8,
-        opcode=0xcb07
+        opcode=0xcb07,
+        run=lambda r, m, o: set_register(r, 'a', rotate_left(r, r.a)),
     ),
     0xcb08: CPUInstruction(
         name='RRC B',
         length=2,
         cycles=8,
-        opcode=0xcb08
+        opcode=0xcb08,
+        run=lambda r, m, o: set_register(r, 'b', rotate_right(r, r.b)),
     ),
     0xcb09: CPUInstruction(
         name='RRC C',
         length=2,
         cycles=8,
-        opcode=0xcb09
+        opcode=0xcb09,
+        run=lambda r, m, o: set_register(r, 'c', rotate_right(r, r.c)),
     ),
     0xcb0a: CPUInstruction(
         name='RRC D',
         length=2,
         cycles=8,
-        opcode=0xcb0a
+        opcode=0xcb0a,
+        run=lambda r, m, o: set_register(r, 'd', rotate_right(r, r.d)),
     ),
     0xcb0b: CPUInstruction(
         name='RRC E',
         length=2,
         cycles=8,
-        opcode=0xcb0b
+        opcode=0xcb0b,
+        run=lambda r, m, o: set_register(r, 'e', rotate_right(r, r.e)),
     ),
     0xcb0c: CPUInstruction(
         name='RRC H',
         length=2,
         cycles=8,
-        opcode=0xcb0c
+        opcode=0xcb0c,
+        run=lambda r, m, o: set_register(r, 'h', rotate_right(r, r.h)),
     ),
     0xcb0d: CPUInstruction(
         name='RRC L',
         length=2,
         cycles=8,
-        opcode=0xcb0d
+        opcode=0xcb0d,
+        run=lambda r, m, o: set_register(r, 'l', rotate_right(r, r.l)),
     ),
     0xcb0e: CPUInstruction(
         name='RRC (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb0e
+        opcode=0xcb0e,
+        run=lambda r, m, o: m.write_u8(r.hl, rotate_right(r, m.read(r.hl))),
     ),
     0xcb0f: CPUInstruction(
         name='RRC A',
         length=2,
         cycles=8,
-        opcode=0xcb0f
+        opcode=0xcb0f,
+        run=lambda r, m, o: set_register(r, 'a', rotate_right(r, r.a)),
     ),
     0xcb10: CPUInstruction(
         name='RL B',
         length=2,
         cycles=8,
-        opcode=0xcb10
+        opcode=0xcb10,
+        run=lambda r, m, o: set_register(r, 'b', rotate_left(r, r.b, through_carry=True)),
     ),
     0xcb11: CPUInstruction(
         name='RL C',
@@ -2092,37 +2274,43 @@ opcodes = {
         name='RL D',
         length=2,
         cycles=8,
-        opcode=0xcb12
+        opcode=0xcb12,
+        run=lambda r, m, o: set_register(r, 'd', rotate_left(r, r.d, through_carry=True)),
     ),
     0xcb13: CPUInstruction(
         name='RL E',
         length=2,
         cycles=8,
-        opcode=0xcb13
+        opcode=0xcb13,
+        run=lambda r, m, o: set_register(r, 'e', rotate_left(r, r.e, through_carry=True)),
     ),
     0xcb14: CPUInstruction(
         name='RL H',
         length=2,
         cycles=8,
-        opcode=0xcb14
+        opcode=0xcb14,
+        run=lambda r, m, o: set_register(r, 'h', rotate_left(r, r.h, through_carry=True)),
     ),
     0xcb15: CPUInstruction(
         name='RL L',
         length=2,
         cycles=8,
-        opcode=0xcb15
+        opcode=0xcb15,
+        run=lambda r, m, o: set_register(r, 'l', rotate_left(r, r.l, through_carry=True)),
     ),
     0xcb16: CPUInstruction(
         name='RL (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb16
+        opcode=0xcb16,
+        run=lambda r, m, o: m.write_u8(r.hl, rotate_left(r, m.read(r.hl), through_carry=True)),
     ),
     0xcb17: CPUInstruction(
         name='RL A',
         length=2,
         cycles=8,
-        opcode=0xcb17
+        opcode=0xcb17,
+        run=lambda r, m, o: set_register(r, 'a', rotate_left(r, r.a, through_carry=True)),
     ),
     0xcb18: CPUInstruction(
         name='RR B',
@@ -2170,7 +2358,8 @@ opcodes = {
         name='RR (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb1e
+        opcode=0xcb1e,
+        run=lambda r, m, o: m.write_u8(r.hl, rotate_right(r, m.read(r.hl), through_carry=True)),
     ),
     0xcb1f: CPUInstruction(
         name='RR A',
@@ -2183,97 +2372,113 @@ opcodes = {
         name='SLA B',
         length=2,
         cycles=8,
-        opcode=0xcb20
+        opcode=0xcb20,
+        run=lambda r, m, o: set_register(r, 'b', shift_left(r, r.b)),
     ),
     0xcb21: CPUInstruction(
         name='SLA C',
         length=2,
         cycles=8,
-        opcode=0xcb21
+        opcode=0xcb21,
+        run=lambda r, m, o: set_register(r, 'c', shift_left(r, r.c)),
     ),
     0xcb22: CPUInstruction(
         name='SLA D',
         length=2,
         cycles=8,
-        opcode=0xcb22
+        opcode=0xcb22,
+        run=lambda r, m, o: set_register(r, 'd', shift_left(r, r.d)),
     ),
     0xcb23: CPUInstruction(
         name='SLA E',
         length=2,
         cycles=8,
-        opcode=0xcb23
+        opcode=0xcb23,
+        run=lambda r, m, o: set_register(r, 'e', shift_left(r, r.e)),
     ),
     0xcb24: CPUInstruction(
         name='SLA H',
         length=2,
         cycles=8,
-        opcode=0xcb24
+        opcode=0xcb24,
+        run=lambda r, m, o: set_register(r, 'h', shift_left(r, r.h)),
     ),
     0xcb25: CPUInstruction(
         name='SLA L',
         length=2,
         cycles=8,
-        opcode=0xcb25
+        opcode=0xcb25,
+        run=lambda r, m, o: set_register(r, 'l', shift_left(r, r.l)),
     ),
     0xcb26: CPUInstruction(
         name='SLA (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb26
+        opcode=0xcb26,
+        run=lambda r, m, o: m.write_u8(r.hl, shift_left(r, m.read(r.hl))),
     ),
     0xcb27: CPUInstruction(
         name='SLA A',
         length=2,
         cycles=8,
-        opcode=0xcb27
+        opcode=0xcb27,
+        run=lambda r, m, o: set_register(r, 'a', shift_left(r, r.a)),
     ),
     0xcb28: CPUInstruction(
         name='SRA B',
         length=2,
         cycles=8,
-        opcode=0xcb28
+        opcode=0xcb28,
+        run=lambda r, m, o: set_register(r, 'b', shift_right_arithmetic(r, r.b)),
     ),
     0xcb29: CPUInstruction(
         name='SRA C',
         length=2,
         cycles=8,
-        opcode=0xcb29
+        opcode=0xcb29,
+        run=lambda r, m, o: set_register(r, 'c', shift_right_arithmetic(r, r.c)),
     ),
     0xcb2a: CPUInstruction(
         name='SRA D',
         length=2,
         cycles=8,
-        opcode=0xcb2a
+        opcode=0xcb2a,
+        run=lambda r, m, o: set_register(r, 'd', shift_right_arithmetic(r, r.d)),
     ),
     0xcb2b: CPUInstruction(
         name='SRA E',
         length=2,
         cycles=8,
-        opcode=0xcb2b
+        opcode=0xcb2b,
+        run=lambda r, m, o: set_register(r, 'e', shift_right_arithmetic(r, r.e)),
     ),
     0xcb2c: CPUInstruction(
         name='SRA H',
         length=2,
         cycles=8,
-        opcode=0xcb2c
+        opcode=0xcb2c,
+        run=lambda r, m, o: set_register(r, 'h', shift_right_arithmetic(r, r.h)),
     ),
     0xcb2d: CPUInstruction(
         name='SRA L',
         length=2,
         cycles=8,
-        opcode=0xcb2d
+        opcode=0xcb2d,
+        run=lambda r, m, o: set_register(r, 'l', shift_right_arithmetic(r, r.l)),
     ),
     0xcb2e: CPUInstruction(
         name='SRA (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb2e
+        opcode=0xcb2e,
+        run=lambda r, m, o: m.write_u8(r.hl, shift_right_arithmetic(r, m.read(r.hl))),
     ),
     0xcb2f: CPUInstruction(
         name='SRA A',
         length=2,
         cycles=8,
-        opcode=0xcb2f
+        opcode=0xcb2f,
+        run=lambda r, m, o: set_register(r, 'a', shift_right_arithmetic(r, r.a)),
     ),
     0xcb30: CPUInstruction(
         name='SWAP B',
@@ -2321,7 +2526,8 @@ opcodes = {
         name='SWAP (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb36
+        opcode=0xcb36,
+        run=lambda r, m, o: m.write_u8(r.hl, swap(r, m.read(r.hl))),
     ),
     0xcb37: CPUInstruction(
         name='SWAP A',
@@ -2335,415 +2541,476 @@ opcodes = {
         length=2,
         cycles=8,
         opcode=0xcb38,
-        run=lambda r, m, o: set_register(r, 'b', shift_right(r, r.b)),
+        run=lambda r, m, o: set_register(r, 'b', shift_right_logical(r, r.b)),
     ),
     0xcb39: CPUInstruction(
         name='SRL C',
         length=2,
         cycles=8,
         opcode=0xcb39,
-        run=lambda r, m, o: set_register(r, 'c', shift_right(r, r.c)),
+        run=lambda r, m, o: set_register(r, 'c', shift_right_logical(r, r.c)),
     ),
     0xcb3a: CPUInstruction(
         name='SRL D',
         length=2,
         cycles=8,
         opcode=0xcb3a,
-        run=lambda r, m, o: set_register(r, 'd', shift_right(r, r.d)),
+        run=lambda r, m, o: set_register(r, 'd', shift_right_logical(r, r.d)),
     ),
     0xcb3b: CPUInstruction(
         name='SRL E',
         length=2,
         cycles=8,
         opcode=0xcb3b,
-        run=lambda r, m, o: set_register(r, 'e', shift_right(r, r.e)),
+        run=lambda r, m, o: set_register(r, 'e', shift_right_logical(r, r.e)),
     ),
     0xcb3c: CPUInstruction(
         name='SRL H',
         length=2,
         cycles=8,
         opcode=0xcb3c,
-        run=lambda r, m, o: set_register(r, 'h', shift_right(r, r.h)),
+        run=lambda r, m, o: set_register(r, 'h', shift_right_logical(r, r.h)),
     ),
     0xcb3d: CPUInstruction(
         name='SRL L',
         length=2,
         cycles=8,
         opcode=0xcb3d,
-        run=lambda r, m, o: set_register(r, 'l', shift_right(r, r.l)),
+        run=lambda r, m, o: set_register(r, 'l', shift_right_logical(r, r.l)),
     ),
     0xcb3e: CPUInstruction(
         name='SRL (HL)',
         length=2,
         cycles=16,
-        opcode=0xcb3e
+        opcode=0xcb3e,
+        run=lambda r, m, o: m.write_u8(r.hl, shift_right_logical(r, m.read(r.hl))),
     ),
     0xcb3f: CPUInstruction(
         name='SRL A',
         length=2,
         cycles=8,
         opcode=0xcb3f,
-        run=lambda r, m, o: set_register(r, 'a', shift_right(r, r.a)),
+        run=lambda r, m, o: set_register(r, 'a', shift_right_logical(r, r.a)),
     ),
     0xcb40: CPUInstruction(
         name='BIT 0,B',
         length=2,
         cycles=8,
-        opcode=0xcb40
+        opcode=0xcb40,
+        run=lambda r, m, o: test_bit(r, r.b, 0),
     ),
     0xcb41: CPUInstruction(
         name='BIT 0,C',
         length=2,
         cycles=8,
-        opcode=0xcb41
+        opcode=0xcb41,
+        run=lambda r, m, o: test_bit(r, r.c, 0),
     ),
     0xcb42: CPUInstruction(
         name='BIT 0,D',
         length=2,
         cycles=8,
-        opcode=0xcb42
+        opcode=0xcb42,
+        run=lambda r, m, o: test_bit(r, r.d, 0),
     ),
     0xcb43: CPUInstruction(
         name='BIT 0,E',
         length=2,
         cycles=8,
-        opcode=0xcb43
+        opcode=0xcb43,
+        run=lambda r, m, o: test_bit(r, r.e, 0),
     ),
     0xcb44: CPUInstruction(
         name='BIT 0,H',
         length=2,
         cycles=8,
-        opcode=0xcb44
+        opcode=0xcb44,
+        run=lambda r, m, o: test_bit(r, r.h, 0),
     ),
     0xcb45: CPUInstruction(
         name='BIT 0,L',
         length=2,
         cycles=8,
-        opcode=0xcb45
+        opcode=0xcb45,
+        run=lambda r, m, o: test_bit(r, r.l, 0),
     ),
     0xcb46: CPUInstruction(
         name='BIT 0,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb46
+        opcode=0xcb46,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 0),
     ),
     0xcb47: CPUInstruction(
         name='BIT 0,A',
         length=2,
         cycles=8,
-        opcode=0xcb47
+        opcode=0xcb47,
+        run=lambda r, m, o: test_bit(r, r.a, 0),
     ),
     0xcb48: CPUInstruction(
         name='BIT 1,B',
         length=2,
         cycles=8,
-        opcode=0xcb48
+        opcode=0xcb48,
+        run=lambda r, m, o: test_bit(r, r.b, 1),
     ),
     0xcb49: CPUInstruction(
         name='BIT 1,C',
         length=2,
         cycles=8,
-        opcode=0xcb49
+        opcode=0xcb49,
+        run=lambda r, m, o: test_bit(r, r.c, 1),
     ),
     0xcb4a: CPUInstruction(
         name='BIT 1,D',
         length=2,
         cycles=8,
-        opcode=0xcb4a
+        opcode=0xcb4a,
+        run=lambda r, m, o: test_bit(r, r.d, 1),
     ),
     0xcb4b: CPUInstruction(
         name='BIT 1,E',
         length=2,
         cycles=8,
-        opcode=0xcb4b
+        opcode=0xcb4b,
+        run=lambda r, m, o: test_bit(r, r.e, 1),
     ),
     0xcb4c: CPUInstruction(
         name='BIT 1,H',
         length=2,
         cycles=8,
-        opcode=0xcb4c
+        opcode=0xcb4c,
+        run=lambda r, m, o: test_bit(r, r.h, 1),
     ),
     0xcb4d: CPUInstruction(
         name='BIT 1,L',
         length=2,
         cycles=8,
-        opcode=0xcb4d
+        opcode=0xcb4d,
+        run=lambda r, m, o: test_bit(r, r.l, 1),
     ),
     0xcb4e: CPUInstruction(
         name='BIT 1,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb4e
+        opcode=0xcb4e,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 1),
     ),
     0xcb4f: CPUInstruction(
         name='BIT 1,A',
         length=2,
         cycles=8,
-        opcode=0xcb4f
+        opcode=0xcb4f,
+        run=lambda r, m, o: test_bit(r, r.a, 1),
     ),
     0xcb50: CPUInstruction(
         name='BIT 2,B',
         length=2,
         cycles=8,
-        opcode=0xcb50
+        opcode=0xcb50,
+        run=lambda r, m, o: test_bit(r, r.b, 2),
     ),
     0xcb51: CPUInstruction(
         name='BIT 2,C',
         length=2,
         cycles=8,
-        opcode=0xcb51
+        opcode=0xcb51,
+        run=lambda r, m, o: test_bit(r, r.c, 2),
     ),
     0xcb52: CPUInstruction(
         name='BIT 2,D',
         length=2,
         cycles=8,
-        opcode=0xcb52
+        opcode=0xcb52,
+        run=lambda r, m, o: test_bit(r, r.d, 2),
     ),
     0xcb53: CPUInstruction(
         name='BIT 2,E',
         length=2,
         cycles=8,
-        opcode=0xcb53
+        opcode=0xcb53,
+        run=lambda r, m, o: test_bit(r, r.e, 2),
     ),
     0xcb54: CPUInstruction(
         name='BIT 2,H',
         length=2,
         cycles=8,
-        opcode=0xcb54
+        opcode=0xcb54,
+        run=lambda r, m, o: test_bit(r, r.h, 2),
     ),
     0xcb55: CPUInstruction(
         name='BIT 2,L',
         length=2,
         cycles=8,
-        opcode=0xcb55
+        opcode=0xcb55,
+        run=lambda r, m, o: test_bit(r, r.l, 2),
     ),
     0xcb56: CPUInstruction(
         name='BIT 2,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb56
+        opcode=0xcb56,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 2),
     ),
     0xcb57: CPUInstruction(
         name='BIT 2,A',
         length=2,
         cycles=8,
-        opcode=0xcb57
+        opcode=0xcb57,
+        run=lambda r, m, o: test_bit(r, r.a, 2),
     ),
     0xcb58: CPUInstruction(
         name='BIT 3,B',
         length=2,
         cycles=8,
-        opcode=0xcb58
+        opcode=0xcb58,
+        run=lambda r, m, o: test_bit(r, r.b, 3),
     ),
     0xcb59: CPUInstruction(
         name='BIT 3,C',
         length=2,
         cycles=8,
-        opcode=0xcb59
+        opcode=0xcb59,
+        run=lambda r, m, o: test_bit(r, r.c, 3),
     ),
     0xcb5a: CPUInstruction(
         name='BIT 3,D',
         length=2,
         cycles=8,
-        opcode=0xcb5a
+        opcode=0xcb5a,
+        run=lambda r, m, o: test_bit(r, r.d, 3),
     ),
     0xcb5b: CPUInstruction(
         name='BIT 3,E',
         length=2,
         cycles=8,
-        opcode=0xcb5b
+        opcode=0xcb5b,
+        run=lambda r, m, o: test_bit(r, r.e, 3),
     ),
     0xcb5c: CPUInstruction(
         name='BIT 3,H',
         length=2,
         cycles=8,
-        opcode=0xcb5c
+        opcode=0xcb5c,
+        run=lambda r, m, o: test_bit(r, r.h, 3),
     ),
     0xcb5d: CPUInstruction(
         name='BIT 3,L',
         length=2,
         cycles=8,
-        opcode=0xcb5d
+        opcode=0xcb5d,
+        run=lambda r, m, o: test_bit(r, r.l, 3),
     ),
     0xcb5e: CPUInstruction(
         name='BIT 3,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb5e
+        opcode=0xcb5e,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 3),
     ),
     0xcb5f: CPUInstruction(
         name='BIT 3,A',
         length=2,
         cycles=8,
-        opcode=0xcb5f
+        opcode=0xcb5f,
+        run=lambda r, m, o: test_bit(r, r.a, 3),
     ),
     0xcb60: CPUInstruction(
         name='BIT 4,B',
         length=2,
         cycles=8,
-        opcode=0xcb60
+        opcode=0xcb60,
+        run=lambda r, m, o: test_bit(r, r.b, 4),
     ),
     0xcb61: CPUInstruction(
         name='BIT 4,C',
         length=2,
         cycles=8,
-        opcode=0xcb61
+        opcode=0xcb61,
+        run=lambda r, m, o: test_bit(r, r.c, 4),
     ),
     0xcb62: CPUInstruction(
         name='BIT 4,D',
         length=2,
         cycles=8,
-        opcode=0xcb62
+        opcode=0xcb62,
+        run=lambda r, m, o: test_bit(r, r.d, 4),
     ),
     0xcb63: CPUInstruction(
         name='BIT 4,E',
         length=2,
         cycles=8,
-        opcode=0xcb63
+        opcode=0xcb63,
+        run=lambda r, m, o: test_bit(r, r.e, 4),
     ),
     0xcb64: CPUInstruction(
         name='BIT 4,H',
         length=2,
         cycles=8,
-        opcode=0xcb64
+        opcode=0xcb64,
+        run=lambda r, m, o: test_bit(r, r.h, 4),
     ),
     0xcb65: CPUInstruction(
         name='BIT 4,L',
         length=2,
         cycles=8,
-        opcode=0xcb65
+        opcode=0xcb65,
+        run=lambda r, m, o: test_bit(r, r.l, 4),
     ),
     0xcb66: CPUInstruction(
         name='BIT 4,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb66
+        opcode=0xcb66,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 4),
     ),
     0xcb67: CPUInstruction(
         name='BIT 4,A',
         length=2,
         cycles=8,
-        opcode=0xcb67
+        opcode=0xcb67,
+        run=lambda r, m, o: test_bit(r, r.a, 4),
     ),
     0xcb68: CPUInstruction(
         name='BIT 5,B',
         length=2,
         cycles=8,
-        opcode=0xcb68
+        opcode=0xcb68,
+        run=lambda r, m, o: test_bit(r, r.b, 5),
     ),
     0xcb69: CPUInstruction(
         name='BIT 5,C',
         length=2,
         cycles=8,
-        opcode=0xcb69
+        opcode=0xcb69,
+        run=lambda r, m, o: test_bit(r, r.c, 5),
     ),
     0xcb6a: CPUInstruction(
         name='BIT 5,D',
         length=2,
         cycles=8,
-        opcode=0xcb6a
+        opcode=0xcb6a,
+        run=lambda r, m, o: test_bit(r, r.d, 5),
     ),
     0xcb6b: CPUInstruction(
         name='BIT 5,E',
         length=2,
         cycles=8,
-        opcode=0xcb6b
+        opcode=0xcb6b,
+        run=lambda r, m, o: test_bit(r, r.e, 5),
     ),
     0xcb6c: CPUInstruction(
         name='BIT 5,H',
         length=2,
         cycles=8,
-        opcode=0xcb6c
+        opcode=0xcb6c,
+        run=lambda r, m, o: test_bit(r, r.h, 5),
     ),
     0xcb6d: CPUInstruction(
         name='BIT 5,L',
         length=2,
         cycles=8,
-        opcode=0xcb6d
+        opcode=0xcb6d,
+        run=lambda r, m, o: test_bit(r, r.l, 5),
     ),
     0xcb6e: CPUInstruction(
         name='BIT 5,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb6e
+        opcode=0xcb6e,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 5),
     ),
     0xcb6f: CPUInstruction(
         name='BIT 5,A',
         length=2,
         cycles=8,
-        opcode=0xcb6f
+        opcode=0xcb6f,
+        run=lambda r, m, o: test_bit(r, r.a, 5),
     ),
     0xcb70: CPUInstruction(
         name='BIT 6,B',
         length=2,
         cycles=8,
-        opcode=0xcb70
+        opcode=0xcb70,
+        run=lambda r, m, o: test_bit(r, r.b, 6),
     ),
     0xcb71: CPUInstruction(
         name='BIT 6,C',
         length=2,
         cycles=8,
-        opcode=0xcb71
+        opcode=0xcb71,
+        run=lambda r, m, o: test_bit(r, r.c, 6),
     ),
     0xcb72: CPUInstruction(
         name='BIT 6,D',
         length=2,
         cycles=8,
-        opcode=0xcb72
+        opcode=0xcb72,
+        run=lambda r, m, o: test_bit(r, r.d, 6),
     ),
     0xcb73: CPUInstruction(
         name='BIT 6,E',
         length=2,
         cycles=8,
-        opcode=0xcb73
+        opcode=0xcb73,
+        run=lambda r, m, o: test_bit(r, r.e, 6),
     ),
     0xcb74: CPUInstruction(
         name='BIT 6,H',
         length=2,
         cycles=8,
-        opcode=0xcb74
+        opcode=0xcb74,
+        run=lambda r, m, o: test_bit(r, r.h, 6),
     ),
     0xcb75: CPUInstruction(
         name='BIT 6,L',
         length=2,
         cycles=8,
-        opcode=0xcb75
+        opcode=0xcb75,
+        run=lambda r, m, o: test_bit(r, r.l, 6),
     ),
     0xcb76: CPUInstruction(
         name='BIT 6,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb76
+        opcode=0xcb76,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 6),
     ),
     0xcb77: CPUInstruction(
         name='BIT 6,A',
         length=2,
         cycles=8,
-        opcode=0xcb77
+        opcode=0xcb77,
+        run=lambda r, m, o: test_bit(r, r.a, 6),
     ),
     0xcb78: CPUInstruction(
         name='BIT 7,B',
         length=2,
         cycles=8,
-        opcode=0xcb78
+        opcode=0xcb78,
+        run=lambda r, m, o: test_bit(r, r.b, 7),
     ),
     0xcb79: CPUInstruction(
         name='BIT 7,C',
         length=2,
         cycles=8,
-        opcode=0xcb79
+        opcode=0xcb79,
+        run=lambda r, m, o: test_bit(r, r.c, 7),
     ),
     0xcb7a: CPUInstruction(
         name='BIT 7,D',
         length=2,
         cycles=8,
-        opcode=0xcb7a
+        opcode=0xcb7a,
+        run=lambda r, m, o: test_bit(r, r.d, 7),
     ),
     0xcb7b: CPUInstruction(
         name='BIT 7,E',
         length=2,
         cycles=8,
-        opcode=0xcb7b
+        opcode=0xcb7b,
+        run=lambda r, m, o: test_bit(r, r.e, 7),
     ),
     0xcb7c: CPUInstruction(
         name='BIT 7,H',
@@ -2756,19 +3023,22 @@ opcodes = {
         name='BIT 7,L',
         length=2,
         cycles=8,
-        opcode=0xcb7d
+        opcode=0xcb7d,
+        run=lambda r, m, o: test_bit(r, r.l, 7),
     ),
     0xcb7e: CPUInstruction(
         name='BIT 7,(HL)',
         length=2,
         cycles=12,
-        opcode=0xcb7e
+        opcode=0xcb7e,
+        run=lambda r, m, o: test_bit(r, m.read(r.hl), 7),
     ),
     0xcb7f: CPUInstruction(
         name='BIT 7,A',
         length=2,
         cycles=8,
-        opcode=0xcb7f
+        opcode=0xcb7f,
+        run=lambda r, m, o: test_bit(r, r.a, 7),
     ),
     0xcb80: CPUInstruction(
         name='RES 0,B',
