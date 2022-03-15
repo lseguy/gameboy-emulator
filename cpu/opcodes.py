@@ -36,6 +36,7 @@ def write_mem_inc_hl(registers: Registers, memory: Memory, value: u8) -> None:
     registers.hl = u16(registers.hl + 1)
 
 
+# TODO: Move arithmetic operations to APU module
 def xor(registers: Registers, lhs: u8, rhs: u8) -> None:
     result = lhs ^ rhs
     # The result always goes into register A
@@ -365,6 +366,7 @@ def noop(*args) -> None:
     pass
 
 
+# TODO: Use opcode table structure and loops to generate some opcodes
 opcodes = {
     0x00: CPUInstruction(
         name='NOP',
@@ -3044,768 +3046,896 @@ opcodes = {
         name='RES 0,B',
         length=2,
         cycles=8,
-        opcode=0xcb80
+        opcode=0xcb80,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 0, 0)),
     ),
     0xcb81: CPUInstruction(
         name='RES 0,C',
         length=2,
         cycles=8,
-        opcode=0xcb81
+        opcode=0xcb81,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 0, 0)),
     ),
     0xcb82: CPUInstruction(
         name='RES 0,D',
         length=2,
         cycles=8,
-        opcode=0xcb82
+        opcode=0xcb82,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 0, 0)),
     ),
     0xcb83: CPUInstruction(
         name='RES 0,E',
         length=2,
         cycles=8,
-        opcode=0xcb83
+        opcode=0xcb83,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 0, 0)),
     ),
     0xcb84: CPUInstruction(
         name='RES 0,H',
         length=2,
         cycles=8,
-        opcode=0xcb84
+        opcode=0xcb84,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 0, 0)),
     ),
     0xcb85: CPUInstruction(
         name='RES 0,L',
         length=2,
         cycles=8,
-        opcode=0xcb85
+        opcode=0xcb85,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 0, 0)),
     ),
     0xcb86: CPUInstruction(
         name='RES 0,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcb86
+        opcode=0xcb86,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 0, 0)),
     ),
     0xcb87: CPUInstruction(
         name='RES 0,A',
         length=2,
         cycles=8,
-        opcode=0xcb87
+        opcode=0xcb87,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 0, 0)),
     ),
     0xcb88: CPUInstruction(
         name='RES 1,B',
         length=2,
         cycles=8,
-        opcode=0xcb88
+        opcode=0xcb88,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 1, 0)),
     ),
     0xcb89: CPUInstruction(
         name='RES 1,C',
         length=2,
         cycles=8,
-        opcode=0xcb89
+        opcode=0xcb89,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 1, 0)),
     ),
     0xcb8a: CPUInstruction(
         name='RES 1,D',
         length=2,
         cycles=8,
-        opcode=0xcb8a
+        opcode=0xcb8a,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 1, 0)),
     ),
     0xcb8b: CPUInstruction(
         name='RES 1,E',
         length=2,
         cycles=8,
-        opcode=0xcb8b
+        opcode=0xcb8b,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 1, 0)),
     ),
     0xcb8c: CPUInstruction(
         name='RES 1,H',
         length=2,
         cycles=8,
-        opcode=0xcb8c
+        opcode=0xcb8c,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 1, 0)),
     ),
     0xcb8d: CPUInstruction(
         name='RES 1,L',
         length=2,
         cycles=8,
-        opcode=0xcb8d
+        opcode=0xcb8d,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 1, 0)),
     ),
     0xcb8e: CPUInstruction(
         name='RES 1,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcb8e
+        opcode=0xcb8e,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 1, 0)),
     ),
     0xcb8f: CPUInstruction(
         name='RES 1,A',
         length=2,
         cycles=8,
-        opcode=0xcb8f
+        opcode=0xcb8f,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 1, 0)),
     ),
     0xcb90: CPUInstruction(
         name='RES 2,B',
         length=2,
         cycles=8,
-        opcode=0xcb90
+        opcode=0xcb90,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 2, 0)),
     ),
     0xcb91: CPUInstruction(
         name='RES 2,C',
         length=2,
         cycles=8,
-        opcode=0xcb91
+        opcode=0xcb91,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 2, 0)),
     ),
     0xcb92: CPUInstruction(
         name='RES 2,D',
         length=2,
         cycles=8,
-        opcode=0xcb92
+        opcode=0xcb92,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 2, 0)),
     ),
     0xcb93: CPUInstruction(
         name='RES 2,E',
         length=2,
         cycles=8,
-        opcode=0xcb93
+        opcode=0xcb93,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 2, 0)),
     ),
     0xcb94: CPUInstruction(
         name='RES 2,H',
         length=2,
         cycles=8,
-        opcode=0xcb94
+        opcode=0xcb94,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 2, 0)),
     ),
     0xcb95: CPUInstruction(
         name='RES 2,L',
         length=2,
         cycles=8,
-        opcode=0xcb95
+        opcode=0xcb95,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 2, 0)),
     ),
     0xcb96: CPUInstruction(
         name='RES 2,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcb96
+        opcode=0xcb96,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 2, 0)),
     ),
     0xcb97: CPUInstruction(
         name='RES 2,A',
         length=2,
         cycles=8,
-        opcode=0xcb97
+        opcode=0xcb97,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 2, 0)),
     ),
     0xcb98: CPUInstruction(
         name='RES 3,B',
         length=2,
         cycles=8,
-        opcode=0xcb98
+        opcode=0xcb98,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 3, 0)),
     ),
     0xcb99: CPUInstruction(
         name='RES 3,C',
         length=2,
         cycles=8,
-        opcode=0xcb99
+        opcode=0xcb99,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 3, 0)),
     ),
     0xcb9a: CPUInstruction(
         name='RES 3,D',
         length=2,
         cycles=8,
-        opcode=0xcb9a
+        opcode=0xcb9a,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 3, 0)),
     ),
     0xcb9b: CPUInstruction(
         name='RES 3,E',
         length=2,
         cycles=8,
-        opcode=0xcb9b
+        opcode=0xcb9b,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 3, 0)),
     ),
     0xcb9c: CPUInstruction(
         name='RES 3,H',
         length=2,
         cycles=8,
-        opcode=0xcb9c
+        opcode=0xcb9c,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 3, 0)),
     ),
     0xcb9d: CPUInstruction(
         name='RES 3,L',
         length=2,
         cycles=8,
-        opcode=0xcb9d
+        opcode=0xcb9d,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 3, 0)),
     ),
     0xcb9e: CPUInstruction(
         name='RES 3,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcb9e
+        opcode=0xcb9e,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 3, 0)),
     ),
     0xcb9f: CPUInstruction(
         name='RES 3,A',
         length=2,
         cycles=8,
-        opcode=0xcb9f
+        opcode=0xcb9f,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 3, 0)),
     ),
     0xcba0: CPUInstruction(
         name='RES 4,B',
         length=2,
         cycles=8,
-        opcode=0xcba0
+        opcode=0xcba0,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 4, 0)),
     ),
     0xcba1: CPUInstruction(
         name='RES 4,C',
         length=2,
         cycles=8,
-        opcode=0xcba1
+        opcode=0xcba1,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 4, 0)),
     ),
     0xcba2: CPUInstruction(
         name='RES 4,D',
         length=2,
         cycles=8,
-        opcode=0xcba2
+        opcode=0xcba2,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 4, 0)),
     ),
     0xcba3: CPUInstruction(
         name='RES 4,E',
         length=2,
         cycles=8,
-        opcode=0xcba3
+        opcode=0xcba3,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 4, 0)),
     ),
     0xcba4: CPUInstruction(
         name='RES 4,H',
         length=2,
         cycles=8,
-        opcode=0xcba4
+        opcode=0xcba4,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 4, 0)),
     ),
     0xcba5: CPUInstruction(
         name='RES 4,L',
         length=2,
         cycles=8,
-        opcode=0xcba5
+        opcode=0xcba5,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 4, 0)),
     ),
     0xcba6: CPUInstruction(
         name='RES 4,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcba6
+        opcode=0xcba6,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 4, 0)),
     ),
     0xcba7: CPUInstruction(
         name='RES 4,A',
         length=2,
         cycles=8,
-        opcode=0xcba7
+        opcode=0xcba7,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 4, 0)),
     ),
     0xcba8: CPUInstruction(
         name='RES 5,B',
         length=2,
         cycles=8,
-        opcode=0xcba8
+        opcode=0xcba8,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 5, 0)),
     ),
     0xcba9: CPUInstruction(
         name='RES 5,C',
         length=2,
         cycles=8,
-        opcode=0xcba9
+        opcode=0xcba9,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 5, 0)),
     ),
     0xcbaa: CPUInstruction(
         name='RES 5,D',
         length=2,
         cycles=8,
-        opcode=0xcbaa
+        opcode=0xcbaa,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 5, 0)),
     ),
     0xcbab: CPUInstruction(
         name='RES 5,E',
         length=2,
         cycles=8,
-        opcode=0xcbab
+        opcode=0xcbab,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 5, 0)),
     ),
     0xcbac: CPUInstruction(
         name='RES 5,H',
         length=2,
         cycles=8,
-        opcode=0xcbac
+        opcode=0xcbac,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 5, 0)),
     ),
     0xcbad: CPUInstruction(
         name='RES 5,L',
         length=2,
         cycles=8,
-        opcode=0xcbad
+        opcode=0xcbad,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 5, 0)),
     ),
     0xcbae: CPUInstruction(
         name='RES 5,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbae
+        opcode=0xcbae,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 5, 0)),
     ),
     0xcbaf: CPUInstruction(
         name='RES 5,A',
         length=2,
         cycles=8,
-        opcode=0xcbaf
+        opcode=0xcbaf,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 5, 0)),
     ),
     0xcbb0: CPUInstruction(
         name='RES 6,B',
         length=2,
         cycles=8,
-        opcode=0xcbb0
+        opcode=0xcbb0,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 6, 0)),
     ),
     0xcbb1: CPUInstruction(
         name='RES 6,C',
         length=2,
         cycles=8,
-        opcode=0xcbb1
+        opcode=0xcbb1,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 6, 0)),
     ),
     0xcbb2: CPUInstruction(
         name='RES 6,D',
         length=2,
         cycles=8,
-        opcode=0xcbb2
+        opcode=0xcbb2,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 6, 0)),
     ),
     0xcbb3: CPUInstruction(
         name='RES 6,E',
         length=2,
         cycles=8,
-        opcode=0xcbb3
+        opcode=0xcbb3,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 6, 0)),
     ),
     0xcbb4: CPUInstruction(
         name='RES 6,H',
         length=2,
         cycles=8,
-        opcode=0xcbb4
+        opcode=0xcbb4,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 6, 0)),
     ),
     0xcbb5: CPUInstruction(
         name='RES 6,L',
         length=2,
         cycles=8,
-        opcode=0xcbb5
+        opcode=0xcbb5,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 6, 0)),
     ),
     0xcbb6: CPUInstruction(
         name='RES 6,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbb6
+        opcode=0xcbb6,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 6, 0)),
     ),
     0xcbb7: CPUInstruction(
         name='RES 6,A',
         length=2,
         cycles=8,
-        opcode=0xcbb7
+        opcode=0xcbb7,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 6, 0)),
     ),
     0xcbb8: CPUInstruction(
         name='RES 7,B',
         length=2,
         cycles=8,
-        opcode=0xcbb8
+        opcode=0xcbb8,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 7, 0)),
     ),
     0xcbb9: CPUInstruction(
         name='RES 7,C',
         length=2,
         cycles=8,
-        opcode=0xcbb9
+        opcode=0xcbb9,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 7, 0)),
     ),
     0xcbba: CPUInstruction(
         name='RES 7,D',
         length=2,
         cycles=8,
-        opcode=0xcbba
+        opcode=0xcbba,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 7, 0)),
     ),
     0xcbbb: CPUInstruction(
         name='RES 7,E',
         length=2,
         cycles=8,
-        opcode=0xcbbb
+        opcode=0xcbbb,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 7, 0)),
     ),
     0xcbbc: CPUInstruction(
         name='RES 7,H',
         length=2,
         cycles=8,
-        opcode=0xcbbc
+        opcode=0xcbbc,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 7, 0)),
     ),
     0xcbbd: CPUInstruction(
         name='RES 7,L',
         length=2,
         cycles=8,
-        opcode=0xcbbd
+        opcode=0xcbbd,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 7, 0)),
     ),
     0xcbbe: CPUInstruction(
         name='RES 7,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbbe
+        opcode=0xcbbe,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 7, 0)),
     ),
     0xcbbf: CPUInstruction(
         name='RES 7,A',
         length=2,
         cycles=8,
-        opcode=0xcbbf
+        opcode=0xcbbf,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 7, 0)),
     ),
     0xcbc0: CPUInstruction(
         name='SET 0,B',
         length=2,
         cycles=8,
-        opcode=0xcbc0
+        opcode=0xcbc0,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 0, 1)),
     ),
     0xcbc1: CPUInstruction(
         name='SET 0,C',
         length=2,
         cycles=8,
-        opcode=0xcbc1
+        opcode=0xcbc1,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 0, 1)),
     ),
     0xcbc2: CPUInstruction(
         name='SET 0,D',
         length=2,
         cycles=8,
-        opcode=0xcbc2
+        opcode=0xcbc2,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 0, 1)),
     ),
     0xcbc3: CPUInstruction(
         name='SET 0,E',
         length=2,
         cycles=8,
-        opcode=0xcbc3
+        opcode=0xcbc3,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 0, 1)),
     ),
     0xcbc4: CPUInstruction(
         name='SET 0,H',
         length=2,
         cycles=8,
-        opcode=0xcbc4
+        opcode=0xcbc4,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 0, 1)),
     ),
     0xcbc5: CPUInstruction(
         name='SET 0,L',
         length=2,
         cycles=8,
-        opcode=0xcbc5
+        opcode=0xcbc5,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 0, 1)),
     ),
     0xcbc6: CPUInstruction(
         name='SET 0,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbc6
+        opcode=0xcbc6,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 0, 1)),
     ),
     0xcbc7: CPUInstruction(
         name='SET 0,A',
         length=2,
         cycles=8,
-        opcode=0xcbc7
+        opcode=0xcbc7,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 0, 1)),
     ),
     0xcbc8: CPUInstruction(
         name='SET 1,B',
         length=2,
         cycles=8,
-        opcode=0xcbc8
+        opcode=0xcbc8,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 1, 1)),
     ),
     0xcbc9: CPUInstruction(
         name='SET 1,C',
         length=2,
         cycles=8,
-        opcode=0xcbc9
+        opcode=0xcbc9,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 1, 1)),
     ),
     0xcbca: CPUInstruction(
         name='SET 1,D',
         length=2,
         cycles=8,
-        opcode=0xcbca
+        opcode=0xcbca,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 1, 1)),
     ),
     0xcbcb: CPUInstruction(
         name='SET 1,E',
         length=2,
         cycles=8,
-        opcode=0xcbcb
+        opcode=0xcbcb,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 1, 1)),
     ),
     0xcbcc: CPUInstruction(
         name='SET 1,H',
         length=2,
         cycles=8,
-        opcode=0xcbcc
+        opcode=0xcbcc,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 1, 1)),
     ),
     0xcbcd: CPUInstruction(
         name='SET 1,L',
         length=2,
         cycles=8,
-        opcode=0xcbcd
+        opcode=0xcbcd,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 1, 1)),
     ),
     0xcbce: CPUInstruction(
         name='SET 1,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbce
+        opcode=0xcbce,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 1, 1)),
     ),
     0xcbcf: CPUInstruction(
         name='SET 1,A',
         length=2,
         cycles=8,
-        opcode=0xcbcf
+        opcode=0xcbcf,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 1, 1)),
     ),
     0xcbd0: CPUInstruction(
         name='SET 2,B',
         length=2,
         cycles=8,
-        opcode=0xcbd0
+        opcode=0xcbd0,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 2, 1)),
     ),
     0xcbd1: CPUInstruction(
         name='SET 2,C',
         length=2,
         cycles=8,
-        opcode=0xcbd1
+        opcode=0xcbd1,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 2, 1)),
     ),
     0xcbd2: CPUInstruction(
         name='SET 2,D',
         length=2,
         cycles=8,
-        opcode=0xcbd2
+        opcode=0xcbd2,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 2, 1)),
     ),
     0xcbd3: CPUInstruction(
         name='SET 2,E',
         length=2,
         cycles=8,
-        opcode=0xcbd3
+        opcode=0xcbd3,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 2, 1)),
     ),
     0xcbd4: CPUInstruction(
         name='SET 2,H',
         length=2,
         cycles=8,
-        opcode=0xcbd4
+        opcode=0xcbd4,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 2, 1)),
     ),
     0xcbd5: CPUInstruction(
         name='SET 2,L',
         length=2,
         cycles=8,
-        opcode=0xcbd5
+        opcode=0xcbd5,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 2, 1)),
     ),
     0xcbd6: CPUInstruction(
         name='SET 2,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbd6
+        opcode=0xcbd6,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 2, 1)),
     ),
     0xcbd7: CPUInstruction(
         name='SET 2,A',
         length=2,
         cycles=8,
-        opcode=0xcbd7
+        opcode=0xcbd7,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 2, 1)),
     ),
     0xcbd8: CPUInstruction(
         name='SET 3,B',
         length=2,
         cycles=8,
-        opcode=0xcbd8
+        opcode=0xcbd8,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 3, 1)),
     ),
     0xcbd9: CPUInstruction(
         name='SET 3,C',
         length=2,
         cycles=8,
-        opcode=0xcbd9
+        opcode=0xcbd9,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 3, 1)),
     ),
     0xcbda: CPUInstruction(
         name='SET 3,D',
         length=2,
         cycles=8,
-        opcode=0xcbda
+        opcode=0xcbda,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 3, 1)),
     ),
     0xcbdb: CPUInstruction(
         name='SET 3,E',
         length=2,
         cycles=8,
-        opcode=0xcbdb
+        opcode=0xcbdb,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 3, 1)),
     ),
     0xcbdc: CPUInstruction(
         name='SET 3,H',
         length=2,
         cycles=8,
-        opcode=0xcbdc
+        opcode=0xcbdc,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 3, 1)),
     ),
     0xcbdd: CPUInstruction(
         name='SET 3,L',
         length=2,
         cycles=8,
-        opcode=0xcbdd
+        opcode=0xcbdd,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 3, 1)),
     ),
     0xcbde: CPUInstruction(
         name='SET 3,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbde
+        opcode=0xcbde,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 3, 1)),
     ),
     0xcbdf: CPUInstruction(
         name='SET 3,A',
         length=2,
         cycles=8,
-        opcode=0xcbdf
+        opcode=0xcbdf,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 3, 1)),
     ),
     0xcbe0: CPUInstruction(
         name='SET 4,B',
         length=2,
         cycles=8,
-        opcode=0xcbe0
+        opcode=0xcbe0,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 4, 1)),
     ),
     0xcbe1: CPUInstruction(
         name='SET 4,C',
         length=2,
         cycles=8,
-        opcode=0xcbe1
+        opcode=0xcbe1,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 4, 1)),
     ),
     0xcbe2: CPUInstruction(
         name='SET 4,D',
         length=2,
         cycles=8,
-        opcode=0xcbe2
+        opcode=0xcbe2,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 4, 1)),
     ),
     0xcbe3: CPUInstruction(
         name='SET 4,E',
         length=2,
         cycles=8,
-        opcode=0xcbe3
+        opcode=0xcbe3,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 4, 1)),
     ),
     0xcbe4: CPUInstruction(
         name='SET 4,H',
         length=2,
         cycles=8,
-        opcode=0xcbe4
+        opcode=0xcbe4,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 4, 1)),
     ),
     0xcbe5: CPUInstruction(
         name='SET 4,L',
         length=2,
         cycles=8,
-        opcode=0xcbe5
+        opcode=0xcbe5,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 4, 1)),
     ),
     0xcbe6: CPUInstruction(
         name='SET 4,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbe6
+        opcode=0xcbe6,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 4, 1)),
     ),
     0xcbe7: CPUInstruction(
         name='SET 4,A',
         length=2,
         cycles=8,
-        opcode=0xcbe7
+        opcode=0xcbe7,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 4, 1)),
     ),
     0xcbe8: CPUInstruction(
         name='SET 5,B',
         length=2,
         cycles=8,
-        opcode=0xcbe8
+        opcode=0xcbe8,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 5, 1)),
     ),
     0xcbe9: CPUInstruction(
         name='SET 5,C',
         length=2,
         cycles=8,
-        opcode=0xcbe9
+        opcode=0xcbe9,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 5, 1)),
     ),
     0xcbea: CPUInstruction(
         name='SET 5,D',
         length=2,
         cycles=8,
-        opcode=0xcbea
+        opcode=0xcbea,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 5, 1)),
     ),
     0xcbeb: CPUInstruction(
         name='SET 5,E',
         length=2,
         cycles=8,
-        opcode=0xcbeb
+        opcode=0xcbeb,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 5, 1)),
     ),
     0xcbec: CPUInstruction(
         name='SET 5,H',
         length=2,
         cycles=8,
-        opcode=0xcbec
+        opcode=0xcbec,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 5, 1)),
     ),
     0xcbed: CPUInstruction(
         name='SET 5,L',
         length=2,
         cycles=8,
-        opcode=0xcbed
+        opcode=0xcbed,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 5, 1)),
     ),
     0xcbee: CPUInstruction(
         name='SET 5,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbee
+        opcode=0xcbee,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 4, 1)),
     ),
     0xcbef: CPUInstruction(
         name='SET 5,A',
         length=2,
         cycles=8,
-        opcode=0xcbef
+        opcode=0xcbef,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 5, 1)),
     ),
     0xcbf0: CPUInstruction(
         name='SET 6,B',
         length=2,
         cycles=8,
-        opcode=0xcbf0
+        opcode=0xcbf0,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 6, 1)),
     ),
     0xcbf1: CPUInstruction(
         name='SET 6,C',
         length=2,
         cycles=8,
-        opcode=0xcbf1
+        opcode=0xcbf1,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 6, 1)),
     ),
     0xcbf2: CPUInstruction(
         name='SET 6,D',
         length=2,
         cycles=8,
-        opcode=0xcbf2
+        opcode=0xcbf2,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 6, 1)),
     ),
     0xcbf3: CPUInstruction(
         name='SET 6,E',
         length=2,
         cycles=8,
-        opcode=0xcbf3
+        opcode=0xcbf3,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 6, 1)),
     ),
     0xcbf4: CPUInstruction(
         name='SET 6,H',
         length=2,
         cycles=8,
-        opcode=0xcbf4
+        opcode=0xcbf4,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 6, 1)),
     ),
     0xcbf5: CPUInstruction(
         name='SET 6,L',
         length=2,
         cycles=8,
-        opcode=0xcbf5
+        opcode=0xcbf5,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 6, 1)),
     ),
     0xcbf6: CPUInstruction(
         name='SET 6,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbf6
+        opcode=0xcbf6,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 4, 1)),
     ),
     0xcbf7: CPUInstruction(
         name='SET 6,A',
         length=2,
         cycles=8,
-        opcode=0xcbf7
+        opcode=0xcbf7,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 6, 1)),
     ),
     0xcbf8: CPUInstruction(
         name='SET 7,B',
         length=2,
         cycles=8,
-        opcode=0xcbf8
+        opcode=0xcbf8,
+        run=lambda r, m, o: setattr(r, 'b', set_bit(r.b, 7, 1)),
     ),
     0xcbf9: CPUInstruction(
         name='SET 7,C',
         length=2,
         cycles=8,
-        opcode=0xcbf9
+        opcode=0xcbf9,
+        run=lambda r, m, o: setattr(r, 'c', set_bit(r.c, 7, 1)),
     ),
     0xcbfa: CPUInstruction(
         name='SET 7,D',
         length=2,
         cycles=8,
-        opcode=0xcbfa
+        opcode=0xcbfa,
+        run=lambda r, m, o: setattr(r, 'd', set_bit(r.d, 7, 1)),
     ),
     0xcbfb: CPUInstruction(
         name='SET 7,E',
         length=2,
         cycles=8,
-        opcode=0xcbfb
+        opcode=0xcbfb,
+        run=lambda r, m, o: setattr(r, 'e', set_bit(r.e, 7, 1)),
     ),
     0xcbfc: CPUInstruction(
         name='SET 7,H',
         length=2,
         cycles=8,
-        opcode=0xcbfc
+        opcode=0xcbfc,
+        run=lambda r, m, o: setattr(r, 'h', set_bit(r.h, 7, 1)),
     ),
     0xcbfd: CPUInstruction(
         name='SET 7,L',
         length=2,
         cycles=8,
-        opcode=0xcbfd
+        opcode=0xcbfd,
+        run=lambda r, m, o: setattr(r, 'l', set_bit(r.l, 7, 1)),
     ),
     0xcbfe: CPUInstruction(
         name='SET 7,(HL)',
         length=2,
         cycles=16,
-        opcode=0xcbfe
+        opcode=0xcbfe,
+        run=lambda r, m, o: m.write(r.hl, set_bit(m.read(r.hl), 4, 1)),
     ),
     0xcbff: CPUInstruction(
         name='SET 7,A',
         length=2,
         cycles=8,
-        opcode=0xcbff
+        opcode=0xcbff,
+        run=lambda r, m, o: setattr(r, 'a', set_bit(r.a, 7, 1)),
     ),
 }
