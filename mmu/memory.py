@@ -46,10 +46,6 @@ class Memory:
 
     @staticmethod
     def _raise_for_invalid_address(address):
-        # 0xFFFF is the IME flag
-        # It can only be manipulated with dedicated CPU instructions
-        # TODO: Check if allowed to write to IME location
-        #if address < 0 or address >= 0xffff:
         if address < 0 or address > 0xffff:
             raise ValueError('Invalid memory address')
 

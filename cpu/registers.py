@@ -37,6 +37,7 @@ class Registers:
     l: u8 = Register()
     sp: u16 = Register()
     pc: u16 = Register()
+    ime: bool = False
 
     @property
     def af(self) -> u16:
@@ -115,6 +116,6 @@ class Registers:
 
         return (
             f'AF={to_hex(self.af)}, BC={to_hex(self.bc)}, DE={to_hex(self.de)}, HL={to_hex(self.hl)}\n'
-            f'SP={to_hex(self.sp)}, PC={to_hex(self.pc)}\n'
+            f'SP={to_hex(self.sp)}, PC={to_hex(self.pc)}, IME={self.ime}\n'
             f'Z={self.z_flag}, N={self.n_flag}, H={self.h_flag}, C={self.c_flag}'
         )

@@ -67,7 +67,6 @@ class Debugger:
 
         self.jump_address = address
 
-
     def _step(self) -> None:
         step = None
 
@@ -80,6 +79,8 @@ class Debugger:
         # We'll already execute the current instruction
         self.skip = step - 1
 
+    def _print_registers(self) -> None:
+        print(f'{BLUE}{self.registers}{RESET}')
 
     def _prompt(self) -> None:
         while True:
@@ -98,7 +99,7 @@ class Debugger:
                 self._step()
                 return
             elif choice == 'r':
-                print(f'{BLUE}{self.registers}{RESET}')
+                self._print_registers()
             elif choice == 'm':
                 self._print_memory()
             elif choice == 'd':

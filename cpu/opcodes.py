@@ -294,16 +294,14 @@ def call(registers: Registers, memory: Memory, dest: u16, condition: bool = True
         registers.pc = dest
 
 
-def disable_interrupts(memory: Memory) -> None:
+def disable_interrupts(registers: Registers) -> None:
     # TODO: Implement delay
-    memory.ime = False
-    pass
+    registers.ime = False
 
 
-def enable_interrupts(memory: Memory) -> None:
+def enable_interrupts(registers: Registers) -> None:
     # TODO: Implement delay
-    memory.ime = True
-    pass
+    registers.ime = True
 
 
 def ret(registers: Registers, memory: Memory, condition: bool = True) -> None:
@@ -313,8 +311,8 @@ def ret(registers: Registers, memory: Memory, condition: bool = True) -> None:
 
 
 def reti(registers: Registers, memory: Memory) -> None:
+    enable_interrupts(registers)
     ret(registers, memory)
-    enable_interrupts(memory)
 
 
 def push_stack(registers: Registers, memory: Memory, value: u16) -> None:
@@ -2063,7 +2061,7 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0xf3,
-        run=lambda r, m, o: disable_interrupts(m),
+        run=lambda r, m, o: disable_interrupts(r),
     ),
     0xf4: CPUInstruction(
         name='UNUSED',
@@ -2118,7 +2116,7 @@ opcodes = {
         length=1,
         cycles=4,
         opcode=0xfb,
-        run=lambda r, m, o: enable_interrupts(m),
+        run=lambda r, m, o: enable_interrupts(r),
     ),
     0xfc: CPUInstruction(
         name='UNUSED',
