@@ -1,6 +1,6 @@
 from cpu.instruction import CPUInstruction
 from cpu.instruction import Operands
-from cpu.opcodes import call
+from cpu.interrupts import InterruptsManager
 from cpu.timer import Timer
 from custom_types import u16
 from debugger import Debugger
@@ -9,28 +9,20 @@ from cpu.opcodes import opcodes
 from cpu.registers import Registers
 from custom_types import u8
 from utils.bit_operations import combine_bytes
-from utils.bit_operations import get_bit
-from utils.bit_operations import set_bit
-
-# Interrupt Flags positions
-IF_VBLANK_POSITION = 0
-IF_LCD_POSITION = 1
-IF_TIMER_POSITION = 2
-IF_SERIAL_POSITION = 3
-IF_JOYPAD_POSITION = 4
 
 
 class CPU:
     def __init__(self, memory: Memory, enable_debugger: bool):
         self.memory = memory
         self.registers = Registers()
-        self.timer = Timer(self.memory)
+        self.interrupt_manager = InterruptsManager(self.registers, self.memory)
+        self.timer = Timer(self.memory, self.interrupt_manager)
 
         self.debugger = Debugger(self.registers, self.memory, self.timer, enable_debugger)
 
         # Skip the bootrom for now and start directly with cartridge data
         self.registers.pc = 0x100
-        self.registers.sp = 0xfffe
+        #self.registers.sp = 0xfffe
 
     def start(self) -> None:
         while True:
@@ -46,11 +38,11 @@ class CPU:
                 self.debugger.debug(instruction, args)
                 self._execute(instruction, args)
             else:
-                self.timer.inc(1)
-                if self._should_disable_halt():
+                self.timer.tick(1)
+                if self.interrupt_manager.is_any_interrupt_scheduled():
                     self.registers.halted = False
 
-            self._check_interrupts()
+            self.interrupt_manager.handle_interrupts()
 
     def _fetch(self) -> u8:
         data = self.memory.read(self.registers.pc)
@@ -68,39 +60,7 @@ class CPU:
     def _execute(self, instruction: CPUInstruction, operands: Operands) -> None:
         branched = instruction.run(self.registers, self.memory, operands)
         cycles = instruction.cycles_branch if branched else instruction.cycles_no_branch
-        self.timer.inc(cycles)
-
-    def _should_disable_halt(self) -> bool:
-        interrupt_flags = self.memory.read(u16(0xff0f))
-        interrupt_enable = self.memory.read(u16(0xffff))
-        return interrupt_enable & interrupt_flags != 0x0
-
-    def _check_interrupts(self):
-        if not self.registers.ime:
-            return
-
-        if self._should_trigger_interrupt(IF_VBLANK_POSITION):
-            self._handle_interrupt(IF_VBLANK_POSITION, u16(0x0040))
-        elif self._should_trigger_interrupt(IF_LCD_POSITION):
-            self._handle_interrupt(IF_LCD_POSITION, u16(0x0048))
-        elif self._should_trigger_interrupt(IF_TIMER_POSITION):
-            self._handle_interrupt(IF_TIMER_POSITION, u16(0x0050))
-        elif self._should_trigger_interrupt(IF_SERIAL_POSITION):
-            self._handle_interrupt(IF_SERIAL_POSITION, u16(0x0058))
-        elif self._should_trigger_interrupt(IF_JOYPAD_POSITION):
-            self._handle_interrupt(IF_JOYPAD_POSITION, u16(0x0060))
-
-    def _handle_interrupt(self, flag_position:int, isr_address: u16):
-        self.registers.ime = False
-        interrupt_flags = self.memory.read(u16(0xff0f))
-        updated_interrupt_flags = u8(set_bit(interrupt_flags, flag_position, 0))
-        self.memory.write_u8(u16(0xff0f), updated_interrupt_flags)
-        call(self.registers, self.memory, isr_address)
-
-    def _should_trigger_interrupt(self, flag_position: int) -> bool:
-        interrupt_enable = self.memory.read(u16(0xffff))
-        interrupt_flags = self.memory.read(u16(0xff0f))
-        return get_bit(interrupt_enable, flag_position) == 1 and get_bit(interrupt_flags, flag_position) == 1
+        self.timer.tick(cycles)
 
     @staticmethod
     def _is_prefixed_opcode(byte: u8) -> bool:

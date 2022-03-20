@@ -37,6 +37,13 @@ class Memory:
             print(chr(self.content[0xff01]), end='')
             self.content[0xff02] = 0x0
 
+    # returns true if there was an overflow
+    def inc_u8(self, address: u16) -> bool:
+        current_value = self.read(address)
+        self.write_u8(address, u8(current_value + 1))
+        return current_value == 0xff
+
+
     def write_u16(self, address: u16, value: u16) -> None:
         self._raise_for_invalid_address(address)
         self._raise_for_invalid_address(address+1)
