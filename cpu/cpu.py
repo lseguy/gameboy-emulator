@@ -13,20 +13,23 @@ from utils.bit_operations import combine_bytes
 
 class CPU:
     def __init__(self, memory: Memory, enable_debugger: bool):
-        self.memory = memory
-        self.registers = Registers()
-        self.interrupt_manager = InterruptsManager(self.registers, self.memory)
-        self.timer = Timer(self.memory, self.interrupt_manager)
-
-        self.debugger = Debugger(self.registers, self.memory, self.timer, enable_debugger)
+        self._memory = memory
+        self._registers = Registers()
+        self._interrupts_manager = InterruptsManager(self._registers, self._memory)
+        self._timer = Timer(self._memory, self._interrupts_manager)
+        self._debugger = Debugger(self._registers, self._memory, self._timer, enable_debugger)
 
         # Skip the bootrom for now and start directly with cartridge data
-        self.registers.pc = 0x100
+        self._registers.pc = 0x100
         #self.registers.sp = 0xfffe
 
     def start(self) -> None:
         while True:
-            if not self.registers.halted:
+            if self._registers.halted:
+                self._timer.tick(1)
+                if self._interrupts_manager.is_any_interrupt_scheduled():
+                    self._registers.halted = False
+            else:
                 byte = self._fetch()
                 instruction = self._decode(byte)
 
@@ -35,18 +38,14 @@ class CPU:
                 else:
                     args = None
 
-                self.debugger.debug(instruction, args)
+                self._debugger.debug(instruction, args)
                 self._execute(instruction, args)
-            else:
-                self.timer.tick(1)
-                if self.interrupt_manager.is_any_interrupt_scheduled():
-                    self.registers.halted = False
 
-            self.interrupt_manager.handle_interrupts()
+            self._interrupts_manager.handle_interrupts()
 
     def _fetch(self) -> u8:
-        data = self.memory.read(self.registers.pc)
-        self.registers.pc = u16(self.registers.pc + 1)
+        data = self._memory.read(self._registers.pc)
+        self._registers.pc = u16(self._registers.pc + 1)
         return data
 
     def _decode(self, byte: u8) -> CPUInstruction:
@@ -58,9 +57,9 @@ class CPU:
         return opcodes[opcode]
 
     def _execute(self, instruction: CPUInstruction, operands: Operands) -> None:
-        branched = instruction.run(self.registers, self.memory, operands)
+        branched = instruction.run(self._registers, self._memory, operands)
         cycles = instruction.cycles_branch if branched else instruction.cycles_no_branch
-        self.timer.tick(cycles)
+        self._timer.tick(cycles)
 
     @staticmethod
     def _is_prefixed_opcode(byte: u8) -> bool:

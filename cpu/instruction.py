@@ -18,27 +18,28 @@ class Operands:
         if len(data) > 2:
             raise ValueError('Operands cannot have more than two bytes')
 
-        self.bytes = data
+        self._bytes = data
 
-    def to_word(self) -> u8:
-        return u8(self.bytes[0])
+    def to_u8(self) -> u8:
+        return u8(self._bytes[0])
 
-    def to_signed_word(self) -> i8:
-        return read_signed(self.to_word())
+    def to_i8(self) -> i8:
+        return read_signed(self.to_u8())
 
-    def to_dword(self) -> u16:
-        if len(self.bytes) < 2:
-            raise RuntimeError('Cannot convert 1 byte to dword')
+    def to_u16(self) -> u16:
+        if len(self._bytes) < 2:
+            raise RuntimeError('Cannot convert 1 byte operand to u16')
 
-        return combine_bytes(u8(self.bytes[1]), u8(self.bytes[0]))
+        return combine_bytes(u8(self._bytes[1]), u8(self._bytes[0]))
 
     def __repr__(self) -> str:
-        if len(self.bytes) == 1:
-            return f'{self.to_word():x}'
+        if len(self._bytes) == 1:
+            return f'{self.to_u8():x}'
 
-        return f'{self.to_dword():x}'
+        return f'{self.to_u16():x}'
 
 
+# The function returns whether the instruction branched or not
 InstructionRunnable = Callable[[Registers, Memory, Operands], bool]
 
 

@@ -1,3 +1,28 @@
+from cpu.alu import add_sp
+from cpu.alu import add_u16
+from cpu.alu import add_u8
+from cpu.alu import add_u8_with_carry
+from cpu.alu import compare
+from cpu.alu import complement
+from cpu.alu import complement_carry_flag
+from cpu.alu import daa
+from cpu.alu import dec_u16
+from cpu.alu import dec_u8
+from cpu.alu import inc_u16
+from cpu.alu import inc_u8
+from cpu.alu import logical_and
+from cpu.alu import logical_or
+from cpu.alu import rotate_left
+from cpu.alu import rotate_right
+from cpu.alu import set_carry_flag
+from cpu.alu import shift_left
+from cpu.alu import shift_right_arithmetic
+from cpu.alu import shift_right_logical
+from cpu.alu import subtract_u8
+from cpu.alu import subtract_u8_with_carry
+from cpu.alu import swap
+from cpu.alu import test_bit
+from cpu.alu import xor
 from cpu.instruction import CPUInstruction
 from cpu.registers import Registers
 from custom_types import i8
@@ -5,7 +30,6 @@ from custom_types import u16
 from mmu.memory import Memory
 from custom_types import u8
 from utils.bit_operations import combine_bytes
-from utils.bit_operations import get_bit
 from utils.bit_operations import set_bit
 from utils.bit_operations import split_bytes
 
@@ -49,263 +73,6 @@ def write_mem_inc_hl(registers: Registers, memory: Memory, value: u8) -> bool:
     return False
 
 
-# TODO: Move arithmetic operations to APU module
-def xor(registers: Registers, lhs: u8, rhs: u8) -> bool:
-    result = lhs ^ rhs
-    # The result always goes into register A
-    registers.a = u8(result)
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = False
-
-    return False
-
-
-def logical_or(registers: Registers, lhs: u8, rhs: u8) -> bool:
-    result = lhs | rhs
-    # The result always goes into register A
-    registers.a = u8(result)
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = False
-
-    return False
-
-
-def logical_and(registers: Registers, lhs: u8, rhs: u8) -> bool:
-    result = lhs & rhs
-    # The result always goes into register A
-    registers.a = u8(result)
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = True
-    registers.c_flag = False
-
-    return False
-
-
-def subtract_u8(registers: Registers, lhs: u8, rhs: u8) -> u8:
-    result = (lhs - rhs) & 0xff
-    # The result always goes into register A
-    registers.z_flag = result == 0
-    registers.n_flag = True
-    registers.h_flag = (rhs & 0x0f) > (lhs & 0x0f)
-    registers.c_flag = rhs > lhs
-
-    return u8(result)
-
-
-def subtract_u8_with_carry(registers: Registers, lhs: u8, rhs: u8) -> u8:
-    carry = int(registers.c_flag)
-    result = (lhs - rhs - carry) & 0xff
-
-    registers.z_flag = result == 0
-    registers.n_flag = True
-    registers.h_flag = ((rhs & 0x0f) + carry) > (lhs & 0x0f)
-    registers.c_flag = rhs + carry > lhs
-
-    return u8(result)
-
-
-def compare(registers: Registers, value: u8) -> bool:
-    subtract_u8(registers, registers.a, value)
-    return False
-
-
-def test_bit(registers: Registers, byte: int, bit_position: int) -> bool:
-    is_set = get_bit(byte, bit_position)
-    registers.z_flag = not is_set
-    registers.n_flag = False
-    registers.h_flag = True
-
-    return False
-
-
-def swap(registers: Registers, byte: u8) -> u8:
-    result = ((byte << 4) & 0xff) | byte >> 4
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = False
-
-    return u8(result)
-
-
-def add_sp(registers: Registers, offset: i8) -> u16:
-    result = (registers.sp + offset) & 0xffff
-    registers.z_flag = False
-    registers.n_flag = False
-    registers.h_flag = (result & 0xf) <= (registers.sp & 0xf)
-    registers.c_flag = (result & 0xff) < (registers.sp & 0xff)
-
-    return u16(result)
-
-
-def add_u8(registers: Registers, lhs: u8, rhs: u8) -> u8:
-    result = (lhs + rhs) & 0xff
-
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = (lhs & 0x0f) + (rhs & 0x0f) > 0x0f
-    registers.c_flag = (lhs + rhs) > 0xff
-
-    return u8(result)
-
-
-def add_u8_with_carry(registers: Registers, lhs: u8, rhs: u8) -> u8:
-    carry = int(registers.c_flag)
-    result = (lhs + rhs + carry) & 0xff
-
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = (lhs & 0x0f) + (rhs & 0x0f) + carry > 0x0f
-    registers.c_flag = (lhs + rhs + carry) > 0xff
-
-    return u8(result)
-
-
-def add_u16(registers: Registers, lhs: u16, rhs: u16) -> u16:
-    result = (lhs + rhs) & 0xffff
-
-    registers.n_flag = False
-    registers.h_flag = (lhs & 0x0fff) + (rhs & 0x0fff) > 0x0fff
-    registers.c_flag = (lhs + rhs) > 0xffff
-
-    return u16(result)
-
-
-def inc_u8(registers: Registers, value: u8) -> u8:
-    result = (value + 1) & 0xff
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = (0x0f & result) < (0x0f & value)
-
-    return u8(result)
-
-
-def inc_u16(value: u16) -> u16:
-    result = (value + 1) & 0xffff
-    # Flags are not affected for increments on u16 registers
-    return u16(result)
-
-
-def dec_u8(registers: Registers, value: u8) -> u8:
-    result = (value - 1) & 0xff
-    registers.z_flag = result == 0
-    registers.n_flag = True
-    registers.h_flag = (0x0f & value) == 0
-
-    return u8(result)
-
-
-def dec_u16(value: u16) -> u16:
-    result = (value - 1) & 0xffff
-    # Flags are not affected for decrements on u16 registers
-    return u16(result)
-
-
-def complement(registers: Registers) -> bool:
-    registers.a = ~registers.a & 0xff
-    registers.n_flag = True
-    registers.h_flag = True
-
-    return False
-
-
-def complement_carry_flag(registers: Registers) -> bool:
-    registers.c_flag = not registers.c_flag
-    registers.n_flag = False
-    registers.h_flag = False
-
-    return False
-
-
-def set_carry_flag(registers: Registers) -> bool:
-    registers.c_flag = True
-    registers.n_flag = False
-    registers.h_flag = False
-
-    return False
-
-
-def rotate_left(registers: Registers, value: u8, through_carry: bool = False, reset_z_flag: bool = False) -> u8:
-    result = (value << 1) & 0xff
-    msb = get_bit(value, 7)
-
-    if through_carry:
-        result |= 0x1 if registers.c_flag else 0x0
-    else:
-        result |= msb
-
-    if reset_z_flag:
-        registers.z_flag = False
-    else:
-        registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = msb != 0
-
-    return u8(result)
-
-
-def rotate_right(registers: Registers, value: u8, through_carry: bool = False, reset_z_flag: bool = False) -> u8:
-    result = value >> 1
-    lsb = get_bit(value, 0)
-
-    if through_carry:
-        result = set_bit(result, 7, 0x1 if registers.c_flag else 0x0)
-    else:
-        result = set_bit(result, 7, lsb)
-
-    if reset_z_flag:
-        registers.z_flag = False
-    else:
-        registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = lsb != 0
-
-    return u8(result)
-
-
-def shift_right_logical(registers: Registers, value: u8) -> u8:
-    result = value >> 1
-
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = value & 0x1 != 0
-
-    return u8(result)
-
-
-def shift_right_arithmetic(registers: Registers, value: u8) -> u8:
-    result = value >> 1
-
-    msb = value >> 7
-    result = set_bit(result, 7, msb)
-
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = value & 0x1 != 0
-
-    return u8(result)
-
-
-def shift_left(registers: Registers, value: u8) -> u8:
-    result = (value << 1) & 0xff
-
-    registers.z_flag = result == 0
-    registers.n_flag = False
-    registers.h_flag = False
-    registers.c_flag = get_bit(value, 7) != 0
-
-    return u8(result)
-
-
 def jump(registers: Registers, dest: u16, condition: bool = True) -> bool:
     if condition:
         registers.pc = dest
@@ -337,6 +104,7 @@ def disable_interrupts(registers: Registers) -> bool:
 def enable_interrupts(registers: Registers) -> bool:
     # TODO: Implement delay
     registers.ime = True
+    return False
 
 
 def ret(registers: Registers, memory: Memory, condition: bool = True) -> bool:
@@ -379,30 +147,6 @@ def restart(registers: Registers, memory: Memory, dest: u16) -> bool:
     return False
 
 
-def daa(registers: Registers) -> bool:
-    result = registers.a
-
-    if registers.n_flag:
-        if registers.h_flag:
-            result -= 0x06
-        if registers.c_flag:
-            result -= 0x60
-    else:
-        if (result & 0x0f) > 9 or registers.h_flag:
-            result += 0x06
-        if result > 0x9f or registers.c_flag:
-            result += 0x60
-            registers.c_flag = True
-
-    result &= 0xff
-    registers.z_flag = result == 0
-    registers.h_flag = False
-
-    registers.a = result
-
-    return False
-
-
 def noop(*args) -> bool:
     return False
 
@@ -428,7 +172,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0x01,
-        run=lambda r, m, o: set_register(r, 'bc', o.to_dword()),
+        run=lambda r, m, o: set_register(r, 'bc', o.to_u16()),
     ),
     0x02: CPUInstruction(
         name='LD (BC),A',
@@ -468,7 +212,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0x06,
-        run=lambda r, m, o: set_register(r, 'b', o.to_word()),
+        run=lambda r, m, o: set_register(r, 'b', o.to_u8()),
     ),
     0x07: CPUInstruction(
         name='RLCA',
@@ -484,7 +228,7 @@ opcodes = {
         cycles_no_branch=20,
         cycles_branch=20,
         opcode=0x08,
-        run=lambda r, m, o: write_mem_u16(m, o.to_dword(), r.sp),
+        run=lambda r, m, o: write_mem_u16(m, o.to_u16(), r.sp),
     ),
     0x09: CPUInstruction(
         name='ADD HL,BC',
@@ -532,7 +276,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0x0e,
-        run=lambda r, m, o: set_register(r, 'c', o.to_word()),
+        run=lambda r, m, o: set_register(r, 'c', o.to_u8()),
     ),
     0x0f: CPUInstruction(
         name='RRCA',
@@ -555,7 +299,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0x11,
-        run=lambda r, m, o: set_register(r, 'de', o.to_dword()),
+        run=lambda r, m, o: set_register(r, 'de', o.to_u16()),
     ),
     0x12: CPUInstruction(
         name='LD (DE),A',
@@ -595,7 +339,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0x16,
-        run=lambda r, m, o: set_register(r, 'd', o.to_word()),
+        run=lambda r, m, o: set_register(r, 'd', o.to_u8()),
     ),
     0x17: CPUInstruction(
         name='RLA',
@@ -611,7 +355,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0x18,
-        run=lambda r, m, o: relative_jump(r, o.to_signed_word()),
+        run=lambda r, m, o: relative_jump(r, o.to_i8()),
     ),
     0x19: CPUInstruction(
         name='ADD HL,DE',
@@ -659,7 +403,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0x1e,
-        run=lambda r, m, o: set_register(r, 'e', o.to_word()),
+        run=lambda r, m, o: set_register(r, 'e', o.to_u8()),
     ),
     0x1f: CPUInstruction(
         name='RRA',
@@ -675,7 +419,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=12,
         opcode=0x20,
-        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=not r.z_flag),
+        run=lambda r, m, o: relative_jump(r, o.to_i8(), condition=not r.z_flag),
     ),
     0x21: CPUInstruction(
         name='LD HL,u16',
@@ -683,7 +427,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0x21,
-        run=lambda r, m, o: set_register(r, 'hl', o.to_dword()),
+        run=lambda r, m, o: set_register(r, 'hl', o.to_u16()),
     ),
     0x22: CPUInstruction(
         name='LD (HL+),A',
@@ -723,7 +467,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0x26,
-        run=lambda r, m, o: set_register(r, 'h', o.to_word()),
+        run=lambda r, m, o: set_register(r, 'h', o.to_u8()),
     ),
     0x27: CPUInstruction(
         name='DAA',
@@ -739,7 +483,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=12,
         opcode=0x28,
-        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=r.z_flag),
+        run=lambda r, m, o: relative_jump(r, o.to_i8(), condition=r.z_flag),
     ),
     0x29: CPUInstruction(
         name='ADD HL,HL',
@@ -787,7 +531,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0x2e,
-        run=lambda r, m, o: set_register(r, 'l', o.to_word()),
+        run=lambda r, m, o: set_register(r, 'l', o.to_u8()),
     ),
     0x2f: CPUInstruction(
         name='CPL',
@@ -803,7 +547,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=12,
         opcode=0x30,
-        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=not r.c_flag),
+        run=lambda r, m, o: relative_jump(r, o.to_i8(), condition=not r.c_flag),
     ),
     0x31: CPUInstruction(
         name='LD SP,u16',
@@ -811,7 +555,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0x31,
-        run=lambda r, m, o: set_register(r, 'sp', o.to_dword()),
+        run=lambda r, m, o: set_register(r, 'sp', o.to_u16()),
     ),
     0x32: CPUInstruction(
         name='LD (HL-),A',
@@ -851,7 +595,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0x36,
-        run=lambda r, m, o: write_mem_u8(m, r.hl, o.to_word()),
+        run=lambda r, m, o: write_mem_u8(m, r.hl, o.to_u8()),
     ),
     0x37: CPUInstruction(
         name='SCF',
@@ -867,7 +611,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=12,
         opcode=0x38,
-        run=lambda r, m, o: relative_jump(r, o.to_signed_word(), condition=r.c_flag),
+        run=lambda r, m, o: relative_jump(r, o.to_i8(), condition=r.c_flag),
     ),
     0x39: CPUInstruction(
         name='ADD HL,SP',
@@ -915,7 +659,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0x3e,
-        run=lambda r, m, o: set_register(r, 'a', o.to_word()),
+        run=lambda r, m, o: set_register(r, 'a', o.to_u8()),
     ),
     0x3f: CPUInstruction(
         name='CCF',
@@ -1971,7 +1715,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=16,
         opcode=0xc2,
-        run=lambda r, m, o: jump(r, o.to_dword(), condition=not r.z_flag),
+        run=lambda r, m, o: jump(r, o.to_u16(), condition=not r.z_flag),
     ),
     0xc3: CPUInstruction(
         name='JP u16',
@@ -1979,7 +1723,7 @@ opcodes = {
         cycles_no_branch=16,
         cycles_branch=16,
         opcode=0xc3,
-        run=lambda r, m, o: set_register(r, 'pc', o.to_dword()),
+        run=lambda r, m, o: set_register(r, 'pc', o.to_u16()),
     ),
     0xc4: CPUInstruction(
         name='CALL NZ,u16',
@@ -1987,7 +1731,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=24,
         opcode=0xc4,
-        run=lambda r, m, o: call(r, m, o.to_dword(), condition=not r.z_flag),
+        run=lambda r, m, o: call(r, m, o.to_u16(), condition=not r.z_flag),
     ),
     0xc5: CPUInstruction(
         name='PUSH BC',
@@ -2003,7 +1747,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xc6,
-        run=lambda r, m, o: set_register(r, 'a', add_u8(r, r.a, o.to_word())),
+        run=lambda r, m, o: set_register(r, 'a', add_u8(r, r.a, o.to_u8())),
     ),
     0xc7: CPUInstruction(
         name='RST 00h',
@@ -2035,7 +1779,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=16,
         opcode=0xca,
-        run=lambda r, m, o: jump(r, o.to_dword(), condition=r.z_flag),
+        run=lambda r, m, o: jump(r, o.to_u16(), condition=r.z_flag),
     ),
     0xcb: CPUInstruction(
         name='PREFIX CB',
@@ -2050,7 +1794,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=24,
         opcode=0xcc,
-        run=lambda r, m, o: call(r, m, o.to_dword(), condition=r.z_flag),
+        run=lambda r, m, o: call(r, m, o.to_u16(), condition=r.z_flag),
     ),
     0xcd: CPUInstruction(
         name='CALL u16',
@@ -2058,7 +1802,7 @@ opcodes = {
         cycles_no_branch=24,
         cycles_branch=24,
         opcode=0xcd,
-        run=lambda r, m, o: call(r, m, o.to_dword()),
+        run=lambda r, m, o: call(r, m, o.to_u16()),
     ),
     0xce: CPUInstruction(
         name='ADC A,u8',
@@ -2066,7 +1810,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xce,
-        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, o.to_word()))
+        run=lambda r, m, o: set_register(r, 'a', add_u8_with_carry(r, r.a, o.to_u8()))
     ),
     0xcf: CPUInstruction(
         name='RST 08h',
@@ -2098,7 +1842,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=16,
         opcode=0xd2,
-        run=lambda r, m, o: jump(r, o.to_dword(), condition=not r.c_flag),
+        run=lambda r, m, o: jump(r, o.to_u16(), condition=not r.c_flag),
     ),
     0xd3: CPUInstruction(
         name='UNUSED',
@@ -2113,7 +1857,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=24,
         opcode=0xd4,
-        run=lambda r, m, o: call(r, m, o.to_dword(), condition=not r.c_flag),
+        run=lambda r, m, o: call(r, m, o.to_u16(), condition=not r.c_flag),
     ),
     0xd5: CPUInstruction(
         name='PUSH DE',
@@ -2129,7 +1873,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xd6,
-        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, o.to_word())),
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8(r, r.a, o.to_u8())),
     ),
     0xd7: CPUInstruction(
         name='RST 10h',
@@ -2161,7 +1905,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=16,
         opcode=0xda,
-        run=lambda r, m, o: jump(r, o.to_dword(), condition=r.c_flag),
+        run=lambda r, m, o: jump(r, o.to_u16(), condition=r.c_flag),
     ),
     0xdb: CPUInstruction(
         name='UNUSED',
@@ -2176,7 +1920,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=24,
         opcode=0xdc,
-        run=lambda r, m, o: call(r, m, o.to_dword(), condition=r.c_flag),
+        run=lambda r, m, o: call(r, m, o.to_u16(), condition=r.c_flag),
     ),
     0xdd: CPUInstruction(
         name='UNUSED',
@@ -2191,7 +1935,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xde,
-        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, o.to_word())),
+        run=lambda r, m, o: set_register(r, 'a', subtract_u8_with_carry(r, r.a, o.to_u8())),
     ),
     0xdf: CPUInstruction(
         name='RST 18h',
@@ -2207,7 +1951,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0xe0,
-        run=lambda r, m, o: write_mem_u8(m, u16(0xff00 + o.to_word()), r.a),
+        run=lambda r, m, o: write_mem_u8(m, u16(0xff00 + o.to_u8()), r.a),
     ),
     0xe1: CPUInstruction(
         name='POP HL',
@@ -2253,7 +1997,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xe6,
-        run=lambda r, m, o: logical_and(r, r.a, o.to_word()),
+        run=lambda r, m, o: logical_and(r, r.a, o.to_u8()),
     ),
     0xe7: CPUInstruction(
         name='RST 20h',
@@ -2269,7 +2013,7 @@ opcodes = {
         cycles_no_branch=16,
         cycles_branch=16,
         opcode=0xe8,
-        run=lambda r, m, o: set_register(r, 'sp', add_sp(r, o.to_signed_word())),
+        run=lambda r, m, o: set_register(r, 'sp', add_sp(r, o.to_i8())),
     ),
     0xe9: CPUInstruction(
         name='JP HL',
@@ -2285,7 +2029,7 @@ opcodes = {
         cycles_no_branch=16,
         cycles_branch=16,
         opcode=0xea,
-        run=lambda r, m, o: write_mem_u8(m, o.to_dword(), r.a),
+        run=lambda r, m, o: write_mem_u8(m, o.to_u16(), r.a),
     ),
     0xeb: CPUInstruction(
         name='UNUSED',
@@ -2314,7 +2058,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xee,
-        run=lambda r, m, o: xor(r, r.a, o.to_word()),
+        run=lambda r, m, o: xor(r, r.a, o.to_u8()),
     ),
     0xef: CPUInstruction(
         name='RST 28h',
@@ -2330,7 +2074,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0xf0,
-        run=lambda r, m, o: set_register(r, 'a', m.read(u16(0xff00 + o.to_word()))),
+        run=lambda r, m, o: set_register(r, 'a', m.read(u16(0xff00 + o.to_u8()))),
     ),
     0xf1: CPUInstruction(
         name='POP AF',
@@ -2377,7 +2121,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xf6,
-        run=lambda r, m, o: logical_or(r, r.a, o.to_word()),
+        run=lambda r, m, o: logical_or(r, r.a, o.to_u8()),
     ),
     0xf7: CPUInstruction(
         name='RST 30h',
@@ -2393,7 +2137,7 @@ opcodes = {
         cycles_no_branch=12,
         cycles_branch=12,
         opcode=0xf8,
-        run=lambda r, m, o: set_register(r, 'hl', add_sp(r, o.to_signed_word())),
+        run=lambda r, m, o: set_register(r, 'hl', add_sp(r, o.to_i8())),
     ),
     0xf9: CPUInstruction(
         name='LD SP,HL',
@@ -2409,7 +2153,7 @@ opcodes = {
         cycles_no_branch=16,
         cycles_branch=16,
         opcode=0xfa,
-        run=lambda r, m, o: set_register(r, 'a', m.read(o.to_dword())),
+        run=lambda r, m, o: set_register(r, 'a', m.read(o.to_u16())),
     ),
     0xfb: CPUInstruction(
         name='EI',
@@ -2439,7 +2183,7 @@ opcodes = {
         cycles_no_branch=8,
         cycles_branch=8,
         opcode=0xfe,
-        run=lambda r, m, o: compare(r, o.to_word()),
+        run=lambda r, m, o: compare(r, o.to_u8()),
     ),
     0xff: CPUInstruction(
         name='RST 38h',
