@@ -37,7 +37,9 @@ class Registers:
     l: u8 = Register()
     sp: u16 = Register()
     pc: u16 = Register()
+
     ime: bool = False
+    halted: bool = False
 
     @property
     def af(self) -> u16:

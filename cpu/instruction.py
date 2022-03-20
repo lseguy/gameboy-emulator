@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Callable
-from typing import Optional
 
 from cpu.registers import Registers
 from custom_types import i8
@@ -40,13 +39,17 @@ class Operands:
         return f'{self.to_dword():x}'
 
 
+InstructionRunnable = Callable[[Registers, Memory, Operands], bool]
+
+
 @dataclass
 class CPUInstruction:
     name: str
     opcode: int
     length: int
-    cycles: int
-    run: Callable[[Registers, Memory, Operands], None] = None
+    cycles_no_branch: int
+    cycles_branch: int
+    run: InstructionRunnable = None
 
     def __post_init__(self):
         def _default_operation(*args):

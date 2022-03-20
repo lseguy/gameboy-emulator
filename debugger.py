@@ -3,6 +3,7 @@ import sys
 from cpu.instruction import CPUInstruction
 from cpu.instruction import Operands
 from cpu.registers import Registers
+from cpu.timer import Timer
 from mmu.memory import Memory
 
 GREEN = '\033[32m'
@@ -11,9 +12,10 @@ RESET = '\033[0m'
 
 
 class Debugger:
-    def __init__(self, registers: Registers, memory: Memory, enabled: bool):
+    def __init__(self, registers: Registers, memory: Memory, timer: Timer, enabled: bool):
         self.memory = memory
         self.registers = registers
+        self.timer = timer
         self.enabled = enabled
         self.jump_address = None
         self.skip = None
@@ -82,11 +84,14 @@ class Debugger:
     def _print_registers(self) -> None:
         print(f'{BLUE}{self.registers}{RESET}')
 
+    def _print_timing(self) -> None:
+        print(f'{BLUE}{self.timer}{RESET}')
+
     def _prompt(self) -> None:
         while True:
             choice = input(
                 f'print [r]egisters / print [m]emory / [q]uit / [s]tep / '
-                f'[j]ump / [d]isable debugger / [c]ontinue (default): '
+                f'[j]ump / [d]isable debugger / [t]iming information / [c]ontinue (default): '
             )
             if choice == '' or choice == 'c':
                 return
@@ -100,6 +105,8 @@ class Debugger:
                 return
             elif choice == 'r':
                 self._print_registers()
+            elif choice == 't':
+                self._print_timing()
             elif choice == 'm':
                 self._print_memory()
             elif choice == 'd':

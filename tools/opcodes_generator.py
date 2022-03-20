@@ -8,8 +8,9 @@ def to_dict_entry(value: int, json_object: dict) -> str:
         f"{hex_repr}: CPUInstruction(\n"
         f"    name='{json_object['Name']}\',\n"
         f"    length={json_object['Length']},\n"
-        f"    cycles={json_object['TCyclesNoBranch']},\n"
-        f"    opcode={hex_repr}\n"
+        f"    cycles_no_branch={json_object['TCyclesNoBranch']},\n"
+        f"    cycles_branch={json_object['TCyclesBranch']},\n"
+        f"    opcode={hex_repr},\n"
         f"),"
     )
 

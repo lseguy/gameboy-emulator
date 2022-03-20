@@ -30,7 +30,7 @@ class Memory:
 
     def write_u8(self, address: u16, value: u8) -> None:
         self._raise_for_invalid_address(address)
-        self.content[address] = value
+        self.content[address] = value & 0xff
 
         # Blargg serial test output
         if address == 0xff02 and value == 0x81:
@@ -41,8 +41,8 @@ class Memory:
         self._raise_for_invalid_address(address)
         self._raise_for_invalid_address(address+1)
         msb, lsb = split_bytes(value)
-        self.content[address] = lsb
-        self.content[address+1] = msb
+        self.content[address] = lsb & 0xff
+        self.content[address+1] = msb & 0xff
 
     @staticmethod
     def _raise_for_invalid_address(address):

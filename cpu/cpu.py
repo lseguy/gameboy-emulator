@@ -1,6 +1,7 @@
 from cpu.instruction import CPUInstruction
 from cpu.instruction import Operands
 from cpu.opcodes import call
+from cpu.timer import Timer
 from custom_types import u16
 from debugger import Debugger
 from mmu.memory import Memory
@@ -18,31 +19,37 @@ IF_TIMER_POSITION = 2
 IF_SERIAL_POSITION = 3
 IF_JOYPAD_POSITION = 4
 
-FREQUENCY = 1_048_576  # Hertz
-
 
 class CPU:
     def __init__(self, memory: Memory, enable_debugger: bool):
         self.memory = memory
         self.registers = Registers()
+        self.timer = Timer(self.memory)
 
-        self.debugger = Debugger(self.registers, self.memory, enable_debugger)
+        self.debugger = Debugger(self.registers, self.memory, self.timer, enable_debugger)
 
         # Skip the bootrom for now and start directly with cartridge data
         self.registers.pc = 0x100
+        self.registers.sp = 0xfffe
 
     def start(self) -> None:
         while True:
-            byte = self._fetch()
-            instruction = self._decode(byte)
+            if not self.registers.halted:
+                byte = self._fetch()
+                instruction = self._decode(byte)
 
-            if instruction.args_length:
-                args = Operands(bytes(self._fetch() for _ in range(instruction.args_length)))
+                if instruction.args_length:
+                    args = Operands(bytes(self._fetch() for _ in range(instruction.args_length)))
+                else:
+                    args = None
+
+                self.debugger.debug(instruction, args)
+                self._execute(instruction, args)
             else:
-                args = None
+                self.timer.inc(1)
+                if self._should_disable_halt():
+                    self.registers.halted = False
 
-            self.debugger.debug(instruction, args)
-            self._execute(instruction, args)
             self._check_interrupts()
 
     def _fetch(self) -> u8:
@@ -59,7 +66,14 @@ class CPU:
         return opcodes[opcode]
 
     def _execute(self, instruction: CPUInstruction, operands: Operands) -> None:
-        instruction.run(self.registers, self.memory, operands)
+        branched = instruction.run(self.registers, self.memory, operands)
+        cycles = instruction.cycles_branch if branched else instruction.cycles_no_branch
+        self.timer.inc(cycles)
+
+    def _should_disable_halt(self) -> bool:
+        interrupt_flags = self.memory.read(u16(0xff0f))
+        interrupt_enable = self.memory.read(u16(0xffff))
+        return interrupt_enable & interrupt_flags != 0x0
 
     def _check_interrupts(self):
         if not self.registers.ime:
@@ -79,7 +93,7 @@ class CPU:
     def _handle_interrupt(self, flag_position:int, isr_address: u16):
         self.registers.ime = False
         interrupt_flags = self.memory.read(u16(0xff0f))
-        updated_interrupt_flags = set_bit(interrupt_flags, flag_position, 0)
+        updated_interrupt_flags = u8(set_bit(interrupt_flags, flag_position, 0))
         self.memory.write_u8(u16(0xff0f), updated_interrupt_flags)
         call(self.registers, self.memory, isr_address)
 

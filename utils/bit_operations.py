@@ -1,4 +1,5 @@
 from typing import Tuple
+from typing import TypeVar
 
 from custom_types import i8
 from custom_types import u16
@@ -9,7 +10,10 @@ def get_bit(byte: int, bit_position: int) -> int:
     return (byte >> bit_position) & 1
 
 
-def set_bit(byte: int, bit_position: int, new_value: int) -> int:
+T = TypeVar('T', bound=int)
+
+
+def set_bit(byte: T, bit_position: int, new_value: int) -> T:
     mask = 0xff ^ (1 << bit_position)
     return byte & mask | new_value << bit_position
 
