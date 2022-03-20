@@ -4359,7 +4359,7 @@ opcodes = {
         cycles_no_branch=16,
         cycles_branch=16,
         opcode=0xcbee,
-        run=lambda r, m, o: write_mem_u8(m, r.hl, set_bit(m.read(r.hl), 4, 1)),
+        run=lambda r, m, o: write_mem_u8(m, r.hl, set_bit(m.read(r.hl), 5, 1)),
     ),
     0xcbef: CPUInstruction(
         name='SET 5,A',
@@ -4423,7 +4423,7 @@ opcodes = {
         cycles_no_branch=16,
         cycles_branch=16,
         opcode=0xcbf6,
-        run=lambda r, m, o: write_mem_u8(m, r.hl, set_bit(m.read(r.hl), 4, 1)),
+        run=lambda r, m, o: write_mem_u8(m, r.hl, set_bit(m.read(r.hl), 6, 1)),
     ),
     0xcbf7: CPUInstruction(
         name='SET 6,A',
@@ -4487,7 +4487,7 @@ opcodes = {
         cycles_no_branch=16,
         cycles_branch=16,
         opcode=0xcbfe,
-        run=lambda r, m, o: write_mem_u8(m, r.hl, set_bit(m.read(r.hl), 4, 1)),
+        run=lambda r, m, o: write_mem_u8(m, r.hl, set_bit(m.read(r.hl), 7, 1)),
     ),
     0xcbff: CPUInstruction(
         name='SET 7,A',
